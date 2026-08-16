@@ -54,7 +54,7 @@ class PowerSensor : Sensor<PowerSample>
 
         Sensor::push(s);
 
-        Serial.printf("Power %dmV, %d mA, %d mW, %dmV\n", s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV);
+        Serial.printf("Power %s %dmV, %dmA, %dmW, %dmV\n", name, s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV);
       }
     }
 

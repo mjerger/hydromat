@@ -23,7 +23,7 @@ class Sensor
       buffer.push({now, value});
     }
 
-  private:
+  protected:
   
     const char* name;
     CircularBuffer<Sample, size> buffer;

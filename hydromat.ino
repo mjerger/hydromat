@@ -93,9 +93,6 @@ void setupServer()
   http::server.on("/settings",              HTTP_GET,   []() { http::handleFile("/settings.html");  });
   //server.on("/config",                HTTP_ANY,   []() { handleConfig(server);  });
   http::server.on("/sysinfo",               HTTP_GET,   []() { handleSysinfo();  });
-  //server.on("/pump",                  HTTP_GET,   []() { handlePump("");  });
-  //server.on(UriRegex("/pump/(.*)"),   HTTP_GET,   []() { handlePump(server.pathArg(0));  });
-  //server.on("/tds",                   HTTP_GET,   []() { handleTDS("");  });
   //server.on(UriRegex("/tds/(.*)"),    HTTP_GET,   []() { handleTDS(server.pathArg(0));  });
   
   // we use our own routing hacky hack
@@ -159,7 +156,6 @@ void setup()
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, HIGH);
 
-
   lights.set(SWITCH, [](int i, int t) -> CRGB { 
     if (i == 4-swtch.getPos()) 
       return Effects::ON; 
@@ -184,7 +180,6 @@ void setup()
       lights.set(STATUS_RIGHT, Effects::pulse(2300, 0.05), CRGB::Blue);
   });
 
-  pumps.init();
 
   // switch sets the pump's program
   swtch.setOnChange([](int cur, int last) { 
@@ -192,14 +187,6 @@ void setup()
     Mode mode = (Mode)(cur-1);
     pumps.setMode(mode);
   });
-
-  swtch.init();
-
-  // i2c sensors
-  Wire.begin();
-  powerSensor.init();
-  tempSensor.init();
-
 
   #ifdef SERIAL_ENABLED
     Serial.begin(115200);
@@ -216,6 +203,17 @@ void setup()
     Serial.println("failed");
     lights.errorLoop();
   }
+
+  config.load();
+
+  pumps.init();
+  swtch.init();
+
+  // i2c sensors
+  Wire.begin();
+  powerSensor.init();
+  tempSensor.init();
+
 
   initTimeZone();
   setupServer();

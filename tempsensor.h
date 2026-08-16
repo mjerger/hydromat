@@ -35,23 +35,23 @@ class TempSensor : Sensor<THSample>
       if (last >= sample_ms) {
         last -= sample_ms * (last / sample_ms);
 
-        // TODO handle errors
+        // TODO? handle errors
         THSample s;
         s.temp_c = readTemp();
         s.humid_rel = readHumid();
         Sensor::push(s);
 
-        Serial.printf("Temp %.1f°C  Humid %.1f%rH\n", s.temp_c, s.humid_rel);
+        Serial.printf("Temp %s %.1f°C %.1f%%rH\n", name, s.temp_c, s.humid_rel);
       }
     }
 
     float readTemp(void) {
-    // this can prbly be found in the datasheet, but i got it from here https://github.com/elechouse/SHT21_Arduino
+      // this can prbly be found in the datasheet, but i got it from here https://github.com/elechouse/SHT21_Arduino
       return (-46.85 + 175.72 / 65536.0 * (float)(readRaw(hold_master ? 0xE3 : 0xF3))); 
     }
 
     float readHumid(void) {
-    // this can prbly be found in the datasheet, but i got it from here https://github.com/elechouse/SHT21_Arduino
+      // this can prbly be found in the datasheet, but i got it from here https://github.com/elechouse/SHT21_Arduino
       return (-6.0 + 125.0 / 65536.0 * (float)(readRaw(hold_master ? 0xE5 : 0xF5)));
     }
 
@@ -66,7 +66,7 @@ class TempSensor : Sensor<THSample>
         delay(100);
         Wire.endTransmission();
 
-        Wire.requestFrom(i2c_addr, 3);
+        Wire.requestFrom(i2c_addr, (uint8_t)3);
         while(Wire.available() < 3) {
           ; // wait // hmmmmmmm r u sure
         }
