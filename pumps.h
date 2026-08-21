@@ -104,7 +104,7 @@ class Pumps
 
     typedef void (*OnChange)(Pump&, uint8_t power);
 
-    void setOnChange(OnChange cb) {
+    void hookOnChange(OnChange cb) {
       onChange = cb;
     }
 

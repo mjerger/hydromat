@@ -181,7 +181,7 @@ void setup()
   pumps.add("pump_b", "Aux Pump" , PIN_PUMP_B);
 
   // turn light on only when a pump is on
-  pumps.setOnChange([](Pump& pump, uint8_t power) { 
+  pumps.hookOnChange([](Pump& pump, uint8_t power) { 
     Serial.printf("%s set power %d\n", pump.getName(), power);
     if (!power && pumps.isAllOff())
       lights.set(STATUS_RIGHT, Effects::off);
@@ -191,7 +191,7 @@ void setup()
 
 
   // switch sets the pump's program
-  swtch.setOnChange([](int cur, int last) { 
+  swtch.hookOnChange([](int cur, int last) { 
     Serial.printf("Switch pos %d -> %d\n", last, cur);
     Mode mode = (Mode)(cur-1);
     pumps.setMode(mode);

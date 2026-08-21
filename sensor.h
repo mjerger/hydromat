@@ -25,6 +25,13 @@ class Sensor
       buffer.push({now, value});
     }
 
+    bool isEmpty() const {
+      return buffer.isEmpty();
+    }
+
+    const sample_type &last() const {
+      return buffer.last().val;
+    }
 
   protected:
   

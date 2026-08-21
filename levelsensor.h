@@ -36,6 +36,12 @@ class LevelSensor : Sensor<LevelSample>
               {"maximum", 1000, 100}}
     {}
 
+    typedef void (*OnChange)(const Level& level);
+
+    void hookOnChange(OnChange cb) {
+      onChange = cb;
+    }
+
     void init() {
       pinMode(APIN, INPUT);
     }
@@ -63,6 +69,11 @@ class LevelSensor : Sensor<LevelSample>
 
         Sensor::push(s);
 
+        // level changed
+        if (Sensor::isEmpty() || s.level != Sensor::last().level)
+          if (onChange)
+            onChange(levels[s.level]);
+
         Serial.printf("Level %s %d%% (%d raw)\n", name, s.level, s.raw);
       }
     }
@@ -73,4 +84,6 @@ class LevelSensor : Sensor<LevelSample>
 
     const uint32_t sample_ms;
     const uint32_t sample_offset_ms;
+
+    OnChange onChange;
 };
