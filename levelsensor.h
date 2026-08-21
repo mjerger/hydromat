@@ -24,7 +24,7 @@ class LevelSensor : Sensor<LevelSample>
 
     LevelSensor(
       const char* name = "level",
-      uint32_t    samples_per_hour = 240,
+      uint32_t    samples_per_hour = 3600,
       uint32_t    offset_ms = 0)
     : 
       Sensor(name),
@@ -60,21 +60,24 @@ class LevelSensor : Sensor<LevelSample>
         s.level = 0;
 
         // find next closest level
-        for (uint8_t i=4; i>0; i--) {
+        for (uint8_t i=3; i>0; i--) {
           if (s.raw >= levels[i].raw) {
             s.level = i;
             break;
           }
         }
 
+        // level changed?
+        const bool changed = buffer.isEmpty() || s.level != buffer.last().val.level;
+          
         Sensor::push(s);
 
-        // level changed
-        if (Sensor::isEmpty() || s.level != Sensor::last().level)
-          if (onChange)
-            onChange(levels[s.level]);
+        if (changed && onChange) {
+          onChange(levels[s.level]);
 
-        Serial.printf("Level %s %d%% (%d raw)\n", name, s.level, s.raw);
+          Serial.printf("Level %s %d %s %d%% (%d raw)\n", name, s.level, levels[s.level].name, levels[s.level].percent, s.raw);
+        }
+
       }
     }
     
@@ -85,5 +88,5 @@ class LevelSensor : Sensor<LevelSample>
     const uint32_t sample_ms;
     const uint32_t sample_offset_ms;
 
-    OnChange onChange;
+    OnChange onChange = nullptr;
 };

@@ -18,21 +18,13 @@ class Sensor
       sample_type val;
     };
     
-    void push(sample_type value) {
+    void push(const sample_type& value) {
       time_t now;
       time(&now);
 
       buffer.push({now, value});
     }
-
-    bool isEmpty() const {
-      return buffer.isEmpty();
-    }
-
-    const sample_type &last() const {
-      return buffer.last().val;
-    }
-
+    
   protected:
   
     const char* name;

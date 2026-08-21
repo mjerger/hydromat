@@ -63,7 +63,7 @@ Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
 PowerSensor powerSensor("main_power", 0x41, 240);       // i2c devices on the same wires
 SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
 
-LevelSensor<PIN_LEVEL> levelSensor("main_tank", 1, 10);
+LevelSensor<PIN_LEVEL> levelSensor("main_tank", 3600, 1000);
 
 DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp");
 
@@ -195,6 +195,12 @@ void setup()
     Serial.printf("Switch pos %d -> %d\n", last, cur);
     Mode mode = (Mode)(cur-1);
     pumps.setMode(mode);
+  });
+
+
+  // react on water level changed
+  levelSensor.hookOnChange([](const Level& level) { 
+    Serial.printf("Level changed to %s %d%%\n", level.name, level.percent);
   });
 
   #ifdef SERIAL_ENABLED
