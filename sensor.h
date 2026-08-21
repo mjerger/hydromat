@@ -11,17 +11,20 @@ class Sensor
 
     Sensor (const char* name) : name(name) {}
 
+    const char* getName() { return name; }
+
     struct Sample {
       uint32_t time;
       sample_type val;
     };
-
+    
     void push(sample_type value) {
       time_t now;
       time(&now);
 
       buffer.push({now, value});
     }
+
 
   protected:
   

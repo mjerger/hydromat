@@ -2,15 +2,12 @@
 
 #include <Arduino.h>
 
+template<uint8_t PIN_A, uint8_t PIN_B>
 class Switch 
 {
   public:
 
-    Switch(uint8_t pin_a, uint8_t pin_b) : 
-      pin_a(pin_a), 
-      pin_b(pin_b),
-      pos(1)
-    {}
+    Switch() : pos(1) {}
 
     const int getPos() { return pos; }
 
@@ -21,8 +18,8 @@ class Switch
     }
 
     void init() {
-      pinMode(pin_a, INPUT_PULLUP);
-      pinMode(pin_b, INPUT_PULLUP);
+      pinMode(PIN_A, INPUT_PULLUP);
+      pinMode(PIN_B, INPUT_PULLUP);
     }
 
     void update() {
@@ -42,15 +39,13 @@ class Switch
     }
 
     const int read() {
-      int a = 1-digitalRead(pin_a);
-      int b = 1-digitalRead(pin_b);
+      int a = 1 - digitalRead(PIN_A);
+      int b = 1 - digitalRead(PIN_B);
       return ((a<<1) | b) + 1;
     }
 
   private:
   
-    const uint8_t pin_a;
-    const uint8_t pin_b;
     int pos;
     OnChange onChange = nullptr;
 };

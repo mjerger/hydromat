@@ -16,7 +16,7 @@ enum Light {
   SWITCH_MARK,
 };
 
-template<uint8_t pin>
+template<uint8_t PIN>
 class Lights 
 {
   public:
@@ -37,7 +37,7 @@ class Lights
     {}
 
     void init() {
-      FastLED.addLeds<WS2812, pin, GRB>(leds, num_leds);
+      FastLED.addLeds<WS2812, PIN, GRB>(leds, num_leds);
       FastLED.setBrightness(brightness);
       FastLED.clear();
     }

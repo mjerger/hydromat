@@ -36,29 +36,37 @@
 #include "switch.h"
 #include "lights.h"
 #include "powersensor.h"
-#include "tempsensor.h"
+#include "sht21sensor.h"
+#include "levelsensor.h"
+#include "dallassensors.h"
 
 #include "secrets.h"
 
 #define SERIAL_ENABLED
 
-#define PIN_SCL      D1
-#define PIN_SDA      D2
-#define PIN_PUMP_A   D8
-#define PIN_PUMP_B   D3
-#define PIN_SWITCH_0 D5
-#define PIN_SWITCH_1 D6
-#define PIN_LEDS     D7
-
-Lights<PIN_LEDS> lights;
-Switch swtch(PIN_SWITCH_0, PIN_SWITCH_1);
-
-// i2c devices on the same wires
-PowerSensor powerSensor("main_power", 0x41, 240);
-TempSensor  tempSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
-
 const char *hostname = "hydromat";
 const char *version = "0.2";
+
+#define PIN_SCL        D1
+#define PIN_SDA        D2
+#define PIN_PUMP_A     D8
+#define PIN_PUMP_B     D3
+#define PIN_SWITCH_0   D5
+#define PIN_SWITCH_1   D6
+#define PIN_LEDS       D7
+#define PIN_LEVEL      A0
+#define PIN_DS_ONEWIRE D0
+
+Lights<PIN_LEDS> lights;
+Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
+
+PowerSensor powerSensor("main_power", 0x41, 240);       // i2c devices on the same wires
+SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
+
+LevelSensor<PIN_LEVEL> levelSensor("main_tank", 1, 10);
+
+DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp");
+
 
 bool handleSysinfo()
 {
@@ -78,6 +86,7 @@ bool handleSysinfo()
   // Filesystem
   FSInfo fs_info;
   SPIFFS.info(fs_info);
+
   json["fs_free"]  = String((double)(fs_info.totalBytes - fs_info.usedBytes) / 1024.0, 1) + "k";
   json["fs_used"]  = String((double)fs_info.usedBytes  / 1024.0, 1) + "k";
   json["fs_total"] = String((double)fs_info.totalBytes / 1024.0, 1) + "k";
@@ -208,12 +217,13 @@ void setup()
 
   pumps.init();
   swtch.init();
+  levelSensor.init();
 
   // i2c sensors
   Wire.begin();
   powerSensor.init();
-  tempSensor.init();
-
+  caseSensor.init();
+  dallasSensors.init();
 
   initTimeZone();
   setupServer();
@@ -300,7 +310,9 @@ void loop(void)
   swtch.update();
   pumps.update(dt);
   powerSensor.update(dt);
-  tempSensor.update(dt);
+  caseSensor.update(dt);
+  levelSensor.update(dt);
+  dallasSensors.update(dt);
 
   // lights after internal status changed
   lights.update(dt);

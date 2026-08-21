@@ -23,9 +23,9 @@ class PowerSensor : Sensor<PowerSample>
       uint32_t    offset_ms = 0)
     : 
       Sensor(name),
+      i2c_addr(addr),
       sample_ms(3600000 / samples_per_hour),
       sample_offset_ms(offset_ms),
-      i2c_addr(addr),
       ina219(INA219_WE(addr))
     {}
 
@@ -60,9 +60,9 @@ class PowerSensor : Sensor<PowerSample>
 
   private:
 
+    const uint8_t  i2c_addr;
     const uint32_t sample_ms;
     const uint32_t sample_offset_ms;
-    const uint8_t  i2c_addr;
     
     INA219_WE ina219;
 };

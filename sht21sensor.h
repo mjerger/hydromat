@@ -9,20 +9,21 @@ struct THSample {
   float humid_rel;
 };
 
-class TempSensor : Sensor<THSample>
+
+class SHT21Sensor : public Sensor<THSample>
 {
   public:
 
-    TempSensor(
+    SHT21Sensor(
       const char* name = "temp",
       uint8_t     addr = 0x40,
       uint32_t    samples_per_hour = 240,
       uint32_t    offset_ms = 0)
     : 
       Sensor(name),
+      i2c_addr(addr),
       sample_ms(3600000 / samples_per_hour),
-      sample_offset_ms(offset_ms),
-      i2c_addr(addr)
+      sample_offset_ms(offset_ms)
     {}
 
     void init() {
@@ -77,9 +78,9 @@ class TempSensor : Sensor<THSample>
         return result;
     }
 
+    const uint8_t  i2c_addr;
     const uint32_t sample_ms;
     const uint32_t sample_offset_ms;
-    const uint8_t  i2c_addr;
     
     const bool hold_master = true; // block i2c while taking reading (?)
 };
