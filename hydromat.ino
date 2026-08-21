@@ -55,7 +55,7 @@ const char *version = "0.2";
 #define PIN_SWITCH_1   D6
 #define PIN_LEDS       D7
 #define PIN_LEVEL      A0
-#define PIN_DS_ONEWIRE D0
+#define PIN_DS_ONEWIRE D4
 
 Lights<PIN_LEDS> lights;
 Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
@@ -65,7 +65,7 @@ SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before 
 
 LevelSensor<PIN_LEVEL> levelSensor("main_tank", 3600, 1000);
 
-DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp");
+DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp", 240, 2000);
 
 
 bool handleSysinfo()
