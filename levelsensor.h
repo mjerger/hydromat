@@ -31,8 +31,8 @@ class LevelSensor : Sensor<LevelSample>
       sample_ms(3600000 / samples_per_hour),
       sample_offset_ms(offset_ms),
       levels {{"too_low",    0,  25},
-              {"minimum",  100,  50},
-              {"normal",   500,  70},
+              {"minimum",  350,  50},
+              {"normal",   600,  70},
               {"maximum", 1000, 100}}
     {}
 
