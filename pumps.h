@@ -65,7 +65,8 @@ class Pump
       power = pwr > max_power ? max_power : pwr;;
       analogWrite(pin, power);
       sensor.push(pwr);
-      onChange(*this, power);
+      if (onChange)
+        onChange(*this, power);
     }
 
   private:
@@ -102,12 +103,6 @@ class Pumps
   public:
     Pumps() : mode(PUMP_OFF) {}
 
-    typedef void (*OnChange)(Pump&, uint8_t power);
-
-    void hookOnChange(OnChange cb) {
-      onChange = cb;
-    }
-
     void init() {
       for_each(pump) {
         // load from config and start the crons
@@ -142,10 +137,10 @@ class Pumps
     }
 
     // add a pump (call before init)
-    void add(const char* id, const char* name, uint8_t pin) {
+    void add(const char* id, const char* name, uint8_t pin, Pump::OnChange cb) {
       for (auto& device : devices) {
         if (!device) {
-          device.emplace(id, name, pin, onChange);
+          device.emplace(id, name, pin, cb);
           break;
         }
       }
@@ -168,9 +163,9 @@ class Pumps
           case PUMP_ON:
           case PUMP_OFF:
             if (mode) 
-              turnOnFor(0, 0xff);
+              pump.turnOnFor(0, 0xff);
             else
-              turnOff();
+              pump.turnOff();
 
             // disable all crons
             for (int p=0; p<2; p++)
@@ -179,6 +174,7 @@ class Pumps
             break;
 
           case PROGRAM_1:
+            pump.turnOff();
             for (int i=0; i<10; i++) { 
               Cron.enable (pump.programs[1][i].id);
               Cron.disable(pump.programs[2][i].id);
@@ -186,6 +182,7 @@ class Pumps
             break;
 
           case PROGRAM_2:
+            pump.turnOff();
             for (int i=0; i<10; i++) { 
               Cron.disable(pump.programs[1][i].id);
               Cron.enable (pump.programs[2][i].id);
@@ -206,15 +203,13 @@ class Pumps
         pump.turnOff();
     }
 
-    static void onCronTriggered() {
+    static void onCronTriggered() { 
       pumps.onCronTriggeredImpl();
     }
-    
     
   private:
 
     Mode mode;
-    OnChange onChange = nullptr;
     
     struct Device : Pump
     {

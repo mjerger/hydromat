@@ -162,9 +162,6 @@ void setupOTA()
 
 void setup() 
 { 
-  pinMode(BUILTIN_LED, OUTPUT);
-  digitalWrite(BUILTIN_LED, HIGH);
-
   lights.set(SWITCH, [](int i, int t) -> CRGB { 
     if (i == 4-swtch.getPos()) 
       return Effects::ON; 
@@ -176,19 +173,19 @@ void setup()
   lights.init();
   lights.update(0);
 
-  // two pumps
-  pumps.add("pump_a", "Main Pump", PIN_PUMP_A);
-  pumps.add("pump_b", "Aux Pump" , PIN_PUMP_B);
-
   // turn light on only when a pump is on
-  pumps.hookOnChange([](Pump& pump, uint8_t power) { 
+  static const EFunc pumpPulseEffect = Effects::pulse(2300, 0.05);
+  auto onPumpChange = [](Pump& pump, uint8_t power) { 
     Serial.printf("%s set power %d\n", pump.getName(), power);
     if (!power && pumps.isAllOff())
       lights.set(STATUS_RIGHT, Effects::off);
     else
-      lights.set(STATUS_RIGHT, Effects::pulse(2300, 0.05), CRGB::Blue);
-  });
+      lights.set(STATUS_RIGHT, pumpPulseEffect, CRGB::Blue);
+  };
 
+  // two pumps
+  pumps.add("pump_a", "Main Pump", PIN_PUMP_A, onPumpChange);
+  pumps.add("pump_b", "Aux Pump" , PIN_PUMP_B, onPumpChange);
 
   // switch sets the pump's program
   swtch.hookOnChange([](int cur, int last) { 
@@ -196,7 +193,6 @@ void setup()
     Mode mode = (Mode)(cur-1);
     pumps.setMode(mode);
   });
-
 
   // react on water level changed
   levelSensor.hookOnChange([](const Level& level) { 
@@ -310,9 +306,6 @@ void loop(void)
   const uint32_t dt = now - last;
   last = now;
   
-  // flash blue led 
-  digitalWrite(BUILTIN_LED, (now % 2000) > 420);
-
   swtch.update();
   pumps.update(dt);
   powerSensor.update(dt);
