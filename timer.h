@@ -6,27 +6,77 @@ class Timer
 {
   public:
 
-    Timer(int ms) : 
-      interval_ms(ms), 
-      last(0)
+    Timer(int ms, bool repeat = false) : 
+      interval_ms(ms),
+      repeat(repeat),
+      running(true),
+      tick(false),
+      t(0)
     {}
 
-    bool tick(int ms) {
-      last += ms;
+    bool update(uint32_t ms) {
 
-      if (last >= interval_ms) {
-        last -= interval_ms * (last / interval_ms);
-        return true;
+      if (!running)
+        return false;
+
+      t += ms;
+      tick = false;
+      
+      if (t >= interval_ms) {
+        if (repeat)
+          t -= interval_ms * (t / interval_ms);
+        else
+          running = false;
+        
+        tick = true;
       }
       
-      return false;
+      return tick;
     }
 
-    void reset() { last = 0; }
+    uint32_t interval() {
+      return interval_ms;
+    }
+
+    uint32_t time() {
+      return t;
+    }
+
+    float progress() {
+      return (float) t / (float)interval_ms;
+    }
+
+    bool ticked() {
+      return tick;
+    }
+
+    bool active() {
+      return running;
+    }
+    void start() {
+      running = true;
+    }
+
+    void stop() {
+      running = false;
+    }
+
+    void reset() {
+      t = 0;
+      tick = false;
+    }
+
+    void restart() {
+      reset();
+      start();
+    }
 
   private:
   
     const int interval_ms;
-    int last;
+    const bool repeat;
+    bool running;
+    bool tick;
+    uint32_t t;
 };
 

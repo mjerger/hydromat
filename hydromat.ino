@@ -179,8 +179,10 @@ void setup()
     Serial.printf("%s set power %d\n", pump.getName(), power);
     if (!power && pumps.isAllOff())
       lights.set(STATUS_RIGHT, Effects::off);
-    else
+    else {
       lights.set(STATUS_RIGHT, pumpPulseEffect, CRGB::Blue);
+      lights.wakeUp();
+    }
   };
 
   // two pumps
@@ -192,6 +194,7 @@ void setup()
     Serial.printf("Switch pos %d -> %d\n", last, cur);
     Mode mode = (Mode)(cur-1);
     pumps.setMode(mode);
+    lights.wakeUp();
   });
 
   // react on water level changed
@@ -320,7 +323,7 @@ void loop(void)
   if (dt > 250)
     Serial.println("Stalled dt = "+ String(dt)+ "ms");
 
-  // cap 32hz
+  // cap 60hz
   if (dt < 16)
     FastLED.delay(16 - dt);
 }

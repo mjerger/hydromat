@@ -40,7 +40,7 @@ class Pump
       digitalWrite(pin, 0);
     }
 
-    void update(int ms) {
+    void update(uint32_t ms) {
       if (duration_ms >= ms) {
         duration_ms -= ms;
       } else if (duration_ms) {
