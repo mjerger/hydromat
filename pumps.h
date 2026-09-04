@@ -41,23 +41,30 @@ class Pump
     }
 
     void update(uint32_t ms) {
-      if (duration_ms >= ms) {
-        duration_ms -= ms;
-      } else if (duration_ms) {
-        duration_ms = 0;
+      if (remaining_ms >= ms) {
+        remaining_ms -= ms;
+      } else if (remaining_ms > 0) {
         setPower(0);
+
+        const uint32_t runtime_ms = duration_ms-remaining_ms;
+        remaining_ms = 0;
+
+        Serial.printf(PSTR("Turn off %s after %dms\n"), name, runtime_ms);
       }
     }
 
     void turnOnFor(int seconds, uint8_t pwr) {
-      duration_ms = seconds * 1000;
       const uint8_t p = pwr ? pwr < max_power ? pwr : max_power : max_power;
       setPower(p);
-      Serial.printf(PSTR("Turn on pump %s for %ds at %d power\n"), name, seconds, p);
+
+      duration_ms = seconds * 1000;
+      remaining_ms = duration_ms;
+
+      Serial.printf(PSTR("Turn on %s for %ds at %d power\n"), name, seconds, p);
     }
 
     void turnOff() {
-      duration_ms = 0;
+      remaining_ms = 0;
       setPower(0);
     }
 
@@ -77,6 +84,7 @@ class Pump
     const OnChange onChange;
     
     uint8_t power;
+    uint32_t remaining_ms;
     uint32_t duration_ms;
 
     Sensor<uint8_t> sensor;
@@ -91,11 +99,31 @@ class Pump
 class Pumps;
 extern Pumps pumps;
 
+
 struct Program {
   CronId id = dtINVALID_ALARM_ID;
   uint32_t duration;
   uint8_t power;
 };
+
+
+struct Device : Pump
+{
+  Device(
+    const char* id, 
+    const char* name, 
+    uint8_t pin,
+    OnChange cb) 
+  : 
+    Pump(name, pin, cb), 
+    id(id)
+  {}
+  
+  const char* id;
+
+  Program programs[2][10];
+};
+
 
 // handles the pumps
 class Pumps
@@ -107,7 +135,7 @@ class Pumps
       for_each(pump) {
         // load from config and start the crons
         for (int p=0; p<2; p++) {
-          String prog = String("prog_") + String(p+1);
+          String prog = F("prog_") + String(p+1);
           JsonArray arr = config.get()[pump.id][prog].as<JsonArray>();
           for (int i=0; i<arr.size(); i++) {
             String str = arr[i].as<String>();
@@ -116,7 +144,7 @@ class Pumps
             int spos = str.lastIndexOf("s");
             int ppos = str.lastIndexOf("%");
 
-            String cstr = str.substring(0, cpos);
+            String cstr = str.substring(0, cpos+1);
             int seconds = str.substring(cpos+1, spos).toInt();
             int power   = str.substring(spos+1, ppos).toInt();
 
@@ -125,15 +153,13 @@ class Pumps
             prog.duration = seconds;
             prog.power = (255*(uint32_t)power)/100;
 
-            Serial.printf(PSTR("Add cron for %s prog_%d: '%s' %ds %d%%\n"), pump.getName(), p+1, cstr.c_str(), seconds, power);
+            Serial.printf(PSTR("Add cron #%d for %s program %d: '%s' %ds %d%%\n"), prog.id, pump.getName(), p+1, cstr.c_str(), seconds, power);
           }
         }
       }
     }
 
     void update(uint32_t ms) {
-      Cron.delay();
-
       for_each(pump)
         pump.update(ms);
     }
@@ -159,7 +185,7 @@ class Pumps
     // set mode of all pumps
     void setMode(Mode m) {
       mode = m;
-      Serial.printf("Pumps set mode %d\n", m);
+      Serial.printf(PSTR("Pumps set mode %d\n"), m);
 
       for_each(pump) {
         switch (mode) {
@@ -179,16 +205,16 @@ class Pumps
           case PROGRAM_1:
             pump.turnOff();
             for (int i=0; i<10; i++) { 
-              Cron.enable (pump.programs[1][i].id);
-              Cron.disable(pump.programs[2][i].id);
+              Cron.enable (pump.programs[0][i].id);
+              Cron.disable(pump.programs[1][i].id);
             }
             break;
 
           case PROGRAM_2:
             pump.turnOff();
             for (int i=0; i<10; i++) { 
-              Cron.disable(pump.programs[1][i].id);
-              Cron.enable (pump.programs[2][i].id);
+              Cron.disable(pump.programs[0][i].id);
+              Cron.enable (pump.programs[1][i].id);
             }
             break;
         }
@@ -207,49 +233,36 @@ class Pumps
     }
 
     static void onCronTriggered() { 
-      Serial.println("Pumps onCronTriggered");
       pumps.onCronTriggeredImpl();
     }
     
   private:
 
     Mode mode;
-    
-    struct Device : Pump
-    {
-      Device(
-        const char* id, 
-        const char* name, 
-        uint8_t pin,
-        OnChange cb) 
-      : 
-        Pump(name, pin, cb), 
-        id(id)
-      {}
-      
-      const char* id;
-
-      Program programs[2][10];
-    };
-
     std::array<std::optional<Device>, 2> devices;
 
     void onCronTriggeredImpl() {
-      Serial.println("Pumps onCronTriggered");
 
       // ignore unless programs are enabled
-      if (mode != PROGRAM_1 && mode != PROGRAM_2)
+      if (mode < PROGRAM_1 || mode > PROGRAM_2)
         return;
 
-      // find program that we have to start
+      const uint8_t program = mode - PROGRAM_1;
+      const CronId id = Cron.getTriggeredCronId();
+      Serial.printf(PSTR("Cron #%d triggered "), id);
+      
+      // find the corresponding pump and settings
       for_each(pump) {
-        const CronId id = Cron.getTriggeredCronId();
         for (int i=0; i<10; i++) {
-          auto& prog = pump.programs[mode - PROGRAM_1][i];
-          if (prog.id == id)
+          auto& prog = pump.programs[program][i];
+          if (prog.id == id) {
+            Serial.printf("pump %s\n",pump.id);
             pump.turnOnFor(prog.duration, prog.power);
+            return;
+          }
         }
       }
+      Serial.println("but was ignored ??");
     }
 };
 
