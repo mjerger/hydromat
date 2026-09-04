@@ -75,7 +75,7 @@ class LevelSensor : Sensor<LevelSample>
         if (changed && onChange) {
           onChange(levels[s.level]);
 
-          Serial.printf("Level %s %d %s %d%% (%d raw)\n", name, s.level, levels[s.level].name, levels[s.level].percent, s.raw);
+          Serial.printf(PSTR("Level %s %d %s %d%% (%d raw)\n"), name, s.level, levels[s.level].name, levels[s.level].percent, s.raw);
         }
 
       }

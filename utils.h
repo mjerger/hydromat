@@ -67,13 +67,13 @@ String getCurrentTimeString(bool long_day = false) {
 const String getWiFiStatus() {
   wl_status_t status = WiFi.status();
   switch (status) {
-    case WL_IDLE_STATUS     : return "Idle"; 
-    case WL_NO_SSID_AVAIL   : return "SSID cannot be reached";
-    case WL_SCAN_COMPLETED  : return "Scan completed";
-    case WL_CONNECT_FAILED  : return "Connection failed";
-    case WL_CONNECTION_LOST : return "Connection lost";
-    case WL_WRONG_PASSWORD  : return "Wrong password";
-    case WL_DISCONNECTED    : return "Disconnected";
-    default:                  return "WiFi.status() = " + String(status);
+    case WL_IDLE_STATUS     : return F("Idle"); 
+    case WL_NO_SSID_AVAIL   : return F("SSID cannot be reached");
+    case WL_SCAN_COMPLETED  : return F("Scan completed");
+    case WL_CONNECT_FAILED  : return F("Connection failed");
+    case WL_CONNECTION_LOST : return F("Connection lost");
+    case WL_WRONG_PASSWORD  : return F("Wrong password");
+    case WL_DISCONNECTED    : return F("Disconnected");
+    default:                  return F("WiFi.status() = ") + String(status);
   }
 }

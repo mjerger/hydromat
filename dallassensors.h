@@ -43,7 +43,7 @@ class DallasSensors
       dallas.begin();
 
       auto numFound = dallas.getDeviceCount();
-      Serial.printf("Found %d dallas devices\n", numFound);
+      Serial.printf(PSTR("Found %d dallas devices\n"), numFound);
       
       for (int i=0; i < min(MAX_COUNT, numFound); i++) {
         DeviceAddress addr;
@@ -61,7 +61,7 @@ class DallasSensors
               // create sensor
               sensor.emplace(nameStr, id, addr);
 
-              Serial.printf("Added dallas sensor %s id %d addr ", name, id);
+              Serial.printf(PSTR("Added dallas sensor %s id %d addr "), name, id);
               for (uint8_t i = 0; i < 8; i++) 
                 Serial.printf("%02x", addr[i]);
               Serial.println();
@@ -90,20 +90,20 @@ class DallasSensors
             const char* name = sensor.value().getName();
 
             if (temp == DEVICE_DISCONNECTED_C)
-              Serial.printf("Dallas sensor %s did not respond\n", name);
+              Serial.printf(PSTR("Dallas sensor %s did not respond\n"), name);
             else if (temp == DEVICE_FAULT_OPEN_C)
-              Serial.printf("Dallas sensor %s: error fault open\n", name);
+              Serial.printf(PSTR("Dallas sensor %s: error fault open\n"), name);
             else if (temp == DEVICE_FAULT_SHORTGND_C)
-              Serial.printf("Dallas sensor %s: error fault short ground\n", name);
+              Serial.printf(PSTR("Dallas sensor %s: error fault short ground\n"), name);
             else if (temp == DEVICE_FAULT_SHORTVDD_C)
-              Serial.printf("Dallas sensor %s: error fault short vdd\n", name);
+              Serial.printf(PSTR("Dallas sensor %s: error fault short vdd\n"), name);
             else if (temp == DEVICE_POWER_ON_RESET_C)
-              Serial.printf("Dallas sensor %s: error power on reset\n", name);
+              Serial.printf(PSTR("Dallas sensor %s: error power on reset\n"), name);
             else if (temp == DEVICE_INSUFFICIENT_POWER_C)
-              Serial.printf("Dallas sensor %s: error insufficient power\n", name);
+              Serial.printf(PSTR("Dallas sensor %s: error insufficient power\n"), name);
             else {
               sensor.value().push(temp);
-              Serial.printf("Temp %s %.01f°C\n", name, temp);
+              Serial.printf(PSTR("Temp %s %.01f°C\n"), name, temp);
             }
           }
       }

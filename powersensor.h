@@ -35,7 +35,7 @@ class PowerSensor : Sensor<PowerSample>
       ina219.setBusRange(INA219_BRNG_32);
 
       if (!ina219.init()) {
-        Serial.println("Failed to init ina219 current sensor on i2c address " + String(i2c_addr, 16));
+        Serial.printf(PSTR("Failed to init ina219 current sensor on i2c address %s\n"), String(i2c_addr, 16).c_str());
       }
     }
 
@@ -54,7 +54,7 @@ class PowerSensor : Sensor<PowerSample>
 
         Sensor::push(s);
 
-        Serial.printf("Power %s %dmV, %dmA, %dmW, %dmV\n", name, s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV);
+        Serial.printf(PSTR("Power %s %dmV, %dmA, %dmW, %dmV\n"), name, s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV);
       }
     }
 

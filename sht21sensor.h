@@ -42,7 +42,7 @@ class SHT21Sensor : public Sensor<THSample>
         s.humid_rel = readHumid();
         Sensor::push(s);
 
-        Serial.printf("Temp %s %.1f°C %.1f%%rH\n", name, s.temp_c, s.humid_rel);
+        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), name, s.temp_c, s.humid_rel);
       }
     }
 
