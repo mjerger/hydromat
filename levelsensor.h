@@ -46,7 +46,7 @@ class LevelSensor : Sensor<LevelSample>
       pinMode(APIN, INPUT);
     }
 
-    void update(int ms) {
+    void update(uint32_t ms) {
       static uint32_t last = sample_offset_ms;
       last += ms;
 

@@ -6,7 +6,7 @@ class Timer
 {
   public:
 
-    Timer(int ms, bool repeat = false) : 
+    Timer(uint32_t ms, bool repeat = false) : 
       interval_ms(ms),
       repeat(repeat),
       running(true),
@@ -73,7 +73,7 @@ class Timer
 
   private:
   
-    const int interval_ms;
+    const uint32_t interval_ms;
     const bool repeat;
     bool running;
     bool tick;

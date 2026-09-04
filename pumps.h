@@ -53,7 +53,7 @@ class Pump
       duration_ms = seconds * 1000;
       const uint8_t p = pwr ? pwr < max_power ? pwr : max_power : max_power;
       setPower(p);
-      Serial.printf("Turn on pump %s for %ds at %d power\n", name, seconds, p);
+      Serial.printf(PSTR("Turn on pump %s for %ds at %d power\n"), name, seconds, p);
     }
 
     void turnOff() {
@@ -125,13 +125,15 @@ class Pumps
             prog.duration = seconds;
             prog.power = (255*(uint32_t)power)/100;
 
-            Serial.printf("Add cron for %s prog_%d: '%s' %ds %d%%\n", pump.getName(), p+1, cstr.c_str(), seconds, power);
+            Serial.printf(PSTR("Add cron for %s prog_%d: '%s' %ds %d%%\n"), pump.getName(), p+1, cstr.c_str(), seconds, power);
           }
         }
       }
     }
 
-    void update(int ms) {
+    void update(uint32_t ms) {
+      Cron.delay();
+
       for_each(pump)
         pump.update(ms);
     }
@@ -157,6 +159,7 @@ class Pumps
     // set mode of all pumps
     void setMode(Mode m) {
       mode = m;
+      Serial.printf("Pumps set mode %d\n", m);
 
       for_each(pump) {
         switch (mode) {
@@ -204,6 +207,7 @@ class Pumps
     }
 
     static void onCronTriggered() { 
+      Serial.println("Pumps onCronTriggered");
       pumps.onCronTriggeredImpl();
     }
     

@@ -2,7 +2,7 @@
 
 #include <functional>
 
-using EFunc = std::function<CRGB(int i, int t)>;
+using EFunc = std::function<CRGB(int i, uint32_t t)>;
 
 struct Effect {
   EFunc    func;
@@ -20,18 +20,18 @@ namespace Effects
   }
 
 
-  EFunc off = [](int i, int t) {
+  EFunc off = [](int i, uint32_t t) {
     return OFF;
   };
 
 
-  EFunc on = [](int i, int t) {
+  EFunc on = [](int i, uint32_t t) {
     return ON;
   };
 
 
-  EFunc onFor(int ms) {
-    return [ms] (int i, int t) -> CRGB {
+  EFunc onFor(uint32_t ms) {
+    return [ms] (int i, uint32_t t) -> CRGB {
       if (t > ms)
         return OFF;
       return ON;
@@ -39,8 +39,8 @@ namespace Effects
   };
 
 
-  EFunc blink(int on_ms, int off_ms) {
-    return [on_ms, off_ms] (int i, int t) -> CRGB {
+  EFunc blink(uint32_t on_ms, int off_ms) {
+    return [on_ms, off_ms] (int i, uint32_t t) -> CRGB {
       if (t % (on_ms+off_ms) > on_ms)
         return OFF;
       return ON;
@@ -48,17 +48,17 @@ namespace Effects
   };
 
 
-  EFunc pulse(int ms, float min = 0, float phi = 0) {
-    return [ms, min, phi] (int i, int t) -> CRGB {
+  EFunc pulse(uint32_t ms, float min = 0, float phi = 0) {
+    return [ms, min, phi] (int i, uint32_t t) -> CRGB {
       float phase = (float)(t % ms) / ms + i * phi;
-      float f = (sin(phase * TWO_PI) + 1.0f) * 0.5;
+      float f = (sin(phase * TWO_PI) + 1.0f) * 0.5f;
       return fract(min + (f * (1.0f - min)));
     };
   };
 
 
-  EFunc fadeIn(int ms) {
-    return [ms] (int i, int t) -> CRGB {
+  EFunc fadeIn(uint32_t ms) {
+    return [ms] (int i, uint32_t t) -> CRGB {
       if (t >= ms)
         return ON;
       return fract((float)t / (float)ms);
@@ -66,13 +66,23 @@ namespace Effects
   };
 
 
-  EFunc rainbow(int ms, int len) {
-    return [ms, len] (int i, int t) -> CRGB {
+  EFunc fadeOutAfter(uint32_t on_ms, uint32_t fade_ms) {
+    return [on_ms, fade_ms] (int i, uint32_t t) -> CRGB {
+      if (t < on_ms)
+        return ON;
+      if (t > on_ms + fade_ms)
+        return OFF;
+      return fract(1.0f - (float)(t-on_ms) / (float)fade_ms);
+    };
+  };
+
+
+  EFunc rainbow(uint32_t ms, int len) {
+    return [ms, len] (int i, uint32_t t) -> CRGB {
        float phase = (float)(t % ms) / (float)ms + (float)i/(float)len;
        return CHSV((int)(255*phase)%255,255,255);
     };
   };
-
 
   // deterministic fast hash — same input always gives same output
   static inline uint32_t hash(uint32_t x) {
@@ -84,56 +94,20 @@ namespace Effects
     return x;
   }
 
-  EFunc glitchNeon(int numLeds = 26) {
-    const uint32_t eventPeriod = 4200;        // ms between possible dropout events
-    const uint32_t eventLen = 600;            // how long a dropout event lasts
-    const uint32_t flickerSlot = 60;          // ms per flicker subframe within an event
-    const uint32_t segLenMin = 2;
-    const uint32_t segLenMaxFract=2;
-
-    return [numLeds](int i, int t) -> CRGB {
-      uint32_t ut = (uint32_t)t;
-
-      uint32_t eventIdx = ut / eventPeriod;
-      uint32_t localT = ut % eventPeriod;
-
-      if (localT < eventLen) {
-        uint32_t seed = hash(eventIdx * 0x9E3779B1u);
-
-        // window actually get a dropout
-        if ((seed & 0xFF) < 100) {
-          int segStart = seed % numLeds;
-          int segLen   = segLenMin + ((seed >> 8) % (numLeds/segLenMaxFract-segLenMin)); 
-          int rel = (i - segStart + numLeds) % numLeds;
-
-          if (rel < segLen) {
-            // stutter: several flicker slots within the event, each independently on/off
-            uint32_t slot = localT / flickerSlot;
-            uint32_t flickerSeed = hash(seed ^ (slot * 0xB5297A4Du));
-            if ((flickerSeed & 0xFF) < 180) { // mostly off during the event
-              return Effects::OFF;
-            }
-          }
-        }
-      }
-
-      return Effects::ON;
-    };
-  }
-
-  EFunc glitch(int numLeds = 26) {
+  // note: vibed this, just has to look nice
+  EFunc glitch(uint32_t main_seed = 0, int numLeds = 26) {
     const uint32_t eventPeriod = 4200;        // ms between possible dropout events
     const uint32_t eventLen = 600;            // how long a dropout event lasts
     const uint32_t flickerSlot = 60;          // ms per flicker subframe within an event
 
     // startup behavior
-    const uint32_t startupDuration = 10000;    // ms - startup glitching fades out over this window
+    const uint32_t startupDuration = 10000;   // ms - startup glitching fades out over this window
     const uint32_t startupEventPeriod = 350;  // much faster event cycling during startup
     const uint32_t startupEventLen = 220;     // most of each cycle is "active"
     const uint32_t startupFlickerSlot = 40;   // faster stutter
-    const uint8_t startupOffChanceMax = 220;  // near-total blackout right at t=0
+    const uint8_t  startupOffChanceMax = 220; // near-total blackout right at t=0
 
-    return [numLeds](int i, int t) -> CRGB {
+    return [main_seed, numLeds](int i, uint32_t t) -> CRGB {
       uint32_t ut = (uint32_t)t;
       bool off = false;
 
@@ -143,7 +117,7 @@ namespace Effects
         uint32_t localT = ut % eventPeriod;
 
         if (localT < eventLen) {
-          uint32_t seed = hash(eventIdx * 0x9E3779B1u);
+          uint32_t seed = hash(eventIdx * 0x9E3779B1u + 0xffffu*main_seed);
           if ((seed & 0xFF) < 100) {
             int segStart = seed % numLeds;
             int segLen   = 2 + ((seed >> 8) % (numLeds / 2 - 2));

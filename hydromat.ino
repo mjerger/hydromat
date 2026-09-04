@@ -5,7 +5,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-#include <ArduinoOTA.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
@@ -45,7 +44,7 @@
 #define SERIAL_ENABLED
 
 const char *hostname = "hydromat";
-const char *version = "0.2";
+const char *version = "0.3";
 
 #define PIN_SCL        D1
 #define PIN_SDA        D2
@@ -118,65 +117,100 @@ void setupServer()
   // Start Server
   http::server.begin();
 
-  Serial.println("HTTP server started");
+  Serial.println(PSTR("HTTP server started"));
 }
 
 
-void setupOTA()
+void handleWiFiReconnect() 
 {
-  ArduinoOTA.setHostname(hostname);
-  ArduinoOTA.setPasswordHash(secrets::ota_pwd_hash);
-  //ArduinoOTA.setPassword("testtest");
+  // start true so we can trigger the warning light correctly
+  static bool connected = true;
+  
+  static const EFunc connectingEffect = Effects::blink(1000,500);
+  static const EFunc connectedEffect  = Effects::fadeOutAfter(4200, 6400);
+  static const EFunc disconnectEffect = Effects::blink(500,500);
 
-  ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH)
-      type = "sketch";
-    else // U_SPIFFS
-      type = "filesystem";
+  if (WiFi.status() != WL_CONNECTED) {
 
-    SPIFFS.end();
-    Serial.println("Start updating " + type);
-  });
+    static uint32_t last_ms = 0, last_res_ms = 0, last_rec_ms = 0;
+    const uint32_t now = millis();
 
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
+    if (!last_ms     || connected) last_ms = now;
+    if (!last_rec_ms || connected) last_rec_ms = now;
+    if (!last_res_ms || connected) last_res_ms = now;
+    
+    if (connected) {
+      connected = false;
+      
+      // after startup or disconnect
+      lights.set(STATUS_LEFT, connectingEffect, CRGB::Orange); 
+    }
 
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
+    if (now - last_ms > 15000) {
+      // every 15secs (synced to 10 pulses) to reset the reconnecting effect
+      lights.set(STATUS_LEFT, connectingEffect, CRGB::Orange); 
+      Serial.printf(PSTR("WiFi error: %s\n"), getWiFiStatus().c_str());
+      last_ms = now;
+    }
 
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR)         Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR)   Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR)     Serial.println("End Failed");
-  });
+    if (now - last_rec_ms > 60000) {
+      lights.set(STATUS_LEFT, disconnectEffect, CRGB::Red);
+      Serial.println(PSTR("WiFi reconnecting"));
+      WiFi.disconnect();
+      WiFi.begin(secrets::wifi_ssid, secrets::wifi_pwd);
+      last_rec_ms = now;
+    }
 
-  ArduinoOTA.begin();
+    if (now - last_res_ms > 300000) {
+      lights.set(STATUS_LEFT, Effects::on, CRGB::Red);
+      Serial.println(PSTR("WiFi hard reset"));
+      Serial.flush();
+      delay(250);
+      ESP.restart();
+      last_res_ms = now;
+    }
+
+  } else if (!connected) {
+    connected = true;
+    lights.set(STATUS_LEFT, connectedEffect, CRGB::Green);
+    Serial.printf(PSTR("WiFi successfully connected to %s\n"), WiFi.SSID().c_str());
+    Serial.printf(PSTR("IP address: %s\n"), WiFi.localIP().toString().c_str());
+  }
 }
 
 
 void setup() 
 { 
-  lights.set(SWITCH, [](int i, int t) -> CRGB { 
+  // not sure this is even working
+  pinMode(A0, INPUT);
+  const uint32_t seed = analogRead(A0) % 16;
+
+  #ifdef SERIAL_ENABLED
+    Serial.begin(115200);
+  #endif
+  
+  // banner
+  const char* line = PSTR("----------------------------");
+  Serial.printf(PSTR("\n\n\n%s\n hydromat %s       by manu\n"), line, version);
+  Serial.printf(PSTR(" built %s %s\n"), __DATE__, __TIME__);
+  Serial.println(line);
+  Serial.printf(PSTR("RNG seed is %d\n"), seed);
+
+  // start with lights on
+  lights.set(SWITCH, [](int i, uint32_t t) -> CRGB { 
     if (i == 4-swtch.getPos()) 
       return Effects::ON; 
     return Effects::ON % 4;
   }, Effects::PlasmaPurple);
 
-  lights.set(BACKLIGHT, Effects::glitch(), Effects::PlasmaPurple);
-  //lights.set(STATUS_LEFT, Effects::blink(100, 2300), CRGB::Orange);
+  lights.set(BACKLIGHT, Effects::glitch(seed), Effects::PlasmaPurple);
   lights.init();
   lights.update(0);
 
   // turn light on only when a pump is on
   static const EFunc pumpPulseEffect = Effects::pulse(2300, 0.05);
   auto onPumpChange = [](Pump& pump, uint8_t power) { 
-    Serial.printf("%s set power %d\n", pump.getName(), power);
+    Serial.printf(PSTR("%s set power %d\n"), pump.getName(), power);
     if (!power && pumps.isAllOff())
       lights.set(STATUS_RIGHT, Effects::off);
     else {
@@ -191,30 +225,23 @@ void setup()
 
   // switch sets the pump's program
   swtch.hookOnChange([](int cur, int last) { 
-    Serial.printf("Switch pos %d -> %d\n", last, cur);
+    Serial.printf(PSTR("Switch pos %d -> %d\n"), last, cur);
     Mode mode = (Mode)(cur-1);
     pumps.setMode(mode);
     lights.wakeUp();
   });
 
-  // react on water level changed
+  // react when water level changes
   levelSensor.hookOnChange([](const Level& level) { 
-    Serial.printf("Level changed to %s %d%%\n", level.name, level.percent);
+    Serial.printf(PSTR("Level changed to %s %d%%\n"), level.name, level.percent);
+    // TODO
   });
 
-  #ifdef SERIAL_ENABLED
-    Serial.begin(115200);
-  #endif
-  
-  auto line = F("----------------------------");
-  Serial.printf("\n\n\n%s\n hydromat %s       by manu\n", line, version);
-  Serial.printf(" built %s %s\n", __DATE__, __TIME__);
-  Serial.println(line);
-  Serial.print("\n\nInitializing SPIFFS ... ");
+  Serial.print(PSTR("Initializing SPIFFS ... "));
   if (SPIFFS.begin()) {
-    Serial.println("ok");
+    Serial.println(PSTR("ok"));
   } else {
-    Serial.println("failed");
+    Serial.println(PSTR("failed"));
     lights.errorLoop();
   }
 
@@ -234,69 +261,21 @@ void setup()
   setupServer();
 
   // connect to WIFI
-  Serial.println("Connecting to " + String(secrets::wifi_ssid));
+  Serial.printf(PSTR("Connecting to %s\n"), secrets::wifi_ssid);
   WiFi.mode(WIFI_STA);
   WiFi.persistent(false);
   WiFi.setAutoReconnect(true);
   WiFi.setHostname(hostname);
   WiFi.begin(secrets::wifi_ssid, secrets::wifi_pwd);
 
-  Serial.println("MDNS " + String(hostname) + ".local");
+  Serial.printf(PSTR("MDNS %s.local\n"), hostname);
   MDNS.begin(hostname);
-
-  setupOTA();
 }
-
-
-void handleWiFiReconnect() 
-{
-  static bool connected = false;
-
-  if (WiFi.status() != WL_CONNECTED) {
-
-    static uint32_t last_ms = 0, last_res_ms = 0, last_rec_ms = 0;
-    const uint32_t now = millis();
-
-    if (!last_ms     || connected) last_ms = now;
-    if (!last_rec_ms || connected) last_rec_ms = now;
-    if (!last_res_ms || connected) last_res_ms = now;
-    
-    connected = false;
-    
-    if (now - last_ms > 15000) {
-      Serial.println(getWiFiStatus());
-      last_ms = now;
-    }
-
-    if (now - last_rec_ms > 60000) {
-      Serial.println("Reconnecting");
-      WiFi.disconnect();
-      WiFi.begin(secrets::wifi_ssid, secrets::wifi_pwd);
-      last_rec_ms = now;
-    }
-
-    if (now - last_res_ms > 300000) {
-      Serial.println("Hard reset ");
-      Serial.flush();
-      delay(250);
-      ESP.restart();
-      last_res_ms = now;
-    }
-
-  } else if (!connected) {
-    connected = true;
-    Serial.println("Successfully connected to " + WiFi.SSID());
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-  }
-}
-
 
 void loop(void) 
 {
   handleWiFiReconnect();
 
-  ArduinoOTA.handle();
   http::server.handleClient();
   MDNS.update();
 
@@ -321,7 +300,7 @@ void loop(void)
 
   // slow loop
   if (dt > 250)
-    Serial.println("Stalled dt = "+ String(dt)+ "ms");
+    Serial.printf(PSTR("Stalled dt = %d ms\n"), dt);
 
   // cap 60hz
   if (dt < 16)
