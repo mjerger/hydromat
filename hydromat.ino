@@ -310,6 +310,9 @@ void setup()
   // loads from fs
   config.load();
 
+  // two pumps
+  pumps.add("pump_a", "Main Pump", PIN_PUMP_A, onPumpChange);
+  pumps.add("pump_b", "Aux Pump" , PIN_PUMP_B, onPumpChange);
   pumps.init();
 
   swtch.setOnChange(onSwitchChange);
