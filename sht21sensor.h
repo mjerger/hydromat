@@ -26,8 +26,8 @@ class SHT21Sensor : public Sensor<THSample>
       sample_offset_ms(offset_ms)
     {}
 
-    void init() {
-    }
+    float getTemperature() { return temp_c;    }
+    float getHumidity()    { return humid_rel; }
 
     void update(uint32_t ms) {
       static uint32_t last = sample_offset_ms;
@@ -36,27 +36,28 @@ class SHT21Sensor : public Sensor<THSample>
       if (last >= sample_ms) {
         last -= sample_ms * (last / sample_ms);
 
-        // TODO? handle errors
-        THSample s;
-        s.temp_c = readTemp();
-        s.humid_rel = readHumid();
-        Sensor::push(s);
+        // TODO? handle errors?
+        temp_c = readT();
+        humid_rel = readH();
 
-        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), name, s.temp_c, s.humid_rel);
+        Sensor::push({ temp_c, humid_rel });
+
+        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), name, temp_c, humid_rel);
       }
     }
 
-    float readTemp(void) {
+  private:
+
+    float readT() {
       // this can prbly be found in the datasheet, but i got it from here https://github.com/elechouse/SHT21_Arduino
       return (-46.85 + 175.72 / 65536.0 * (float)(readRaw(hold_master ? 0xE3 : 0xF3))); 
     }
 
-    float readHumid(void) {
+    float readH() {
       // this can prbly be found in the datasheet, but i got it from here https://github.com/elechouse/SHT21_Arduino
       return (-6.0 + 125.0 / 65536.0 * (float)(readRaw(hold_master ? 0xE5 : 0xF5)));
     }
 
-  private:
   
     uint16_t readRaw(uint8_t command)
     {
@@ -83,4 +84,7 @@ class SHT21Sensor : public Sensor<THSample>
     const uint32_t sample_offset_ms;
     
     const bool hold_master = true; // block i2c while taking reading (?)
+
+    float temp_c;
+    float humid_rel;
 };

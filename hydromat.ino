@@ -128,8 +128,8 @@ void handleWiFiReconnect() {
   // start true so we can trigger the warning light correctly
   static bool connected = true;
   
-  static const EFunc connectedEffect  = Effects::fadeOutAfter(4200, 6400);
-  static const EFunc disconnectEffect = Effects::fadeOutAfter(4200, 6400);
+  static const EFunc connectedEffect  = Effects::fadeOutAfter(4200, 2300);
+  static const EFunc disconnectEffect = Effects::fadeOutAfter(4200, 2300);
 
   if (WiFi.status() != WL_CONNECTED) {
 
@@ -152,7 +152,7 @@ void handleWiFiReconnect() {
       last_ms = now;
     }
 
-    if (now - last_rec_ms > 60000) {
+    if (now - last_rec_ms > 120000) {
       lights.set(STATUS_LEFT, disconnectEffect, CRGB::Red);
       Serial.println(PSTR("WiFi reconnecting"));
       WiFi.disconnect();
@@ -160,14 +160,14 @@ void handleWiFiReconnect() {
       last_rec_ms = now;
     }
 
-    if (now - last_res_ms > 300000) {
+    /*if (now - last_res_ms > 300000) {
       lights.set(STATUS_LEFT, Effects::on, CRGB::Red);
       Serial.println(PSTR("WiFi hard reset"));
       Serial.flush();
       delay(250);
       ESP.restart();
       last_res_ms = now;
-    }
+    }*/
 
   } else if (!connected) {
     connected = true;
@@ -195,9 +195,10 @@ void onPumpChange(Pump& pump, uint8_t power) {
     lights.wakeUp();
 }
 
-// updates water level indicator
+// water level indicator and pump lock
 void onWaterLevelChange(const WaterLevel& level) {
   Serial.printf(PSTR("Water level changed to %s %d%%\n"), level.name, level.percent);
+  updatePumpLockout();
   updateRightStatusLight();
 }
 
@@ -208,30 +209,28 @@ void onBatteryLevelChange(const BatteryLevel& level) {
   updateLeftStatusLight();
 }
 
-// lock / unlock pump
+// lock / unlock pumps
 void updatePumpLockout() {
-  const float caseTemp = caseSensor.getSampleCount() ? caseSensor.getLastSample().temp_c  : 0.0f;
-  const bool tooHot = caseTemp < 65.0f;
-  const bool lowPow = battery.getLevel().status == BATT_CRITICAL;
-  const bool allow = !tooHot && !lowPow;
+  const bool tooHot = caseSensor.getTemperature() > 60.0f;
+  const bool lowPow = battery.getLevel().status <= BATT_LOW;
+  const bool lowWater = levelSensor.getLevel().percent <= 25;
+  const bool allow = !tooHot && !lowPow && !lowWater;
 
   if (!allow && !pumps.isLocked()) {
     pumps.lock();
-    lights.wakeUp();
-    
-    Serial.println(PSTR("Pumps locked due to"));
-    if (tooHot) Serial.printf(PSTR(" high internal case temperature (%.1f°C)"), caseTemp);
-    if (lowPow) Serial.printf(PSTR(" low battery (%dmV)"), battery.getVoltage());
+    Serial.print(PSTR("Pumps locked due to"));
+    if (tooHot)   Serial.printf(PSTR(" high internal case temperature (%.1f°C)"), caseSensor.getTemperature());
+    if (lowPow)   Serial.printf(PSTR(" low battery (%.2fV)"), battery.getVoltage());
+    if (lowWater) Serial.printf(PSTR(" low water"));
     Serial.println();
 
   } else if (allow && pumps.isLocked()) {
     pumps.unlock();
-    lights.wakeUp();
     Serial.println(PSTR("Pumps unlocked"));
   }
 }
 
-// right status: Wifi, water level
+// right status: pump activity, water level
 void updateRightStatusLight() {
   static const EFunc slowPulseEffect = Effects::pulse(3000, 0.05);
   static const EFunc fastPulseEffect = Effects::pulse(1000, 0.05);
@@ -239,17 +238,16 @@ void updateRightStatusLight() {
   if (pumps.isRunning()) {
     lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Blue);
   } else { 
-    auto& level = levelSensor.getLevel();
-    switch (level.percent) {
-      case  25: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::Red);    break; // too low
-      case  50: lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Yellow); break; // minimum
-      case 100: lights.set(STATUS_RIGHT, Effects::on, CRGB::Orange);     break; // maximum
+    switch (levelSensor.getLevel().percent) {
+      case  25: lights.set(STATUS_RIGHT, Effects::on,     CRGB::Red);          break; // too low
+      case  50: lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Yellow);       break; // minimum
+      case 100: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::LightSkyBlue); break; // maximum
       default:  lights.set(STATUS_RIGHT, Effects::off);
     }
   }
 }
 
-// left status: pump activity, battery status
+// left status: wifi, battery status
 void updateLeftStatusLight() {
   static const EFunc connectEffect = Effects::blink(1000, 500);
   static const EFunc flashEffect   = Effects::blink(100, 900);
@@ -269,8 +267,7 @@ void updateLeftStatusLight() {
   }
 }
 
-void setup()
-{
+void setup() {
   // try to get a random seed
   pinMode(A0, INPUT);
   const uint32_t seed = analogRead(A0) % 16;
@@ -324,7 +321,9 @@ void setup()
   battery.setOnChange(onBatteryLevelChange);
 
   powerSensor.setOnSample([](const PowerSample& sample) { 
-    battery.updateVoltage(sample.bus_mV); 
+    // inaccurate when pumps are running
+    if (!pumps.isRunning())
+      battery.updateVoltage(sample.batt_mV); 
   });
 
   caseSensor.setOnSample([](const THSample& _) { 
@@ -334,7 +333,6 @@ void setup()
   // i2c
   Wire.begin();
   powerSensor.init();
-  caseSensor.init();
   
   // OneWire
   dallasSensors.init();
@@ -354,8 +352,7 @@ void setup()
   MDNS.begin(hostname);
 }
 
-void loop(void) 
-{
+void loop(void) {
   handleWiFiReconnect();
 
   http::server.handleClient();
@@ -371,14 +368,16 @@ void loop(void)
   last = now;
 
   swtch.update();
-  pumps.update(dt);
   powerSensor.update(dt);
   caseSensor.update(dt);
   levelSensor.update(dt);
   dallasSensors.update(dt);
+  pumps.update(dt);
 
   // lights after internal status changed
-  lights.update(dt);
+  // Note that we run the animation with constant steps,
+  // looks less glitchy when loop stalls
+  lights.update(16);
 
   // slow loop
   if (dt > 250)

@@ -32,7 +32,7 @@ class Pump
       pin(pin), 
       max_power(200),
       onChange(cb),
-      enabled(false),
+      enabled(true),
       power(0),
       remaining_ms(0),
       duration_ms(0),
@@ -44,7 +44,7 @@ class Pump
     const auto& getSensor() const { return sensor; }
 
     void enable()  { enabled = true; }
-    void disable() { enabled = false; turnOff(); }
+    void disable() { turnOff(); enabled = false; }
   
     void init() {
       pinMode(pin, OUTPUT);
@@ -89,6 +89,7 @@ class Pump
       power = pwr > max_power ? max_power : pwr;
       output(power);
       sensor.push(pwr);
+      
       if (onChange)
         onChange(*this, power);
     }

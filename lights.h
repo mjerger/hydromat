@@ -47,7 +47,6 @@ class Lights
         sleep_timer.reset();
         fadeout_timer.restart();
       }
-
       // dim backlight
       if (fadeout_timer.ticked()) {
         brightness = min_brightness;

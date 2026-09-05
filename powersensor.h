@@ -31,11 +31,11 @@ class PowerSensor : public Sensor<PowerSample>
       ina219(INA219_WE(addr))
     {}
 
-    uint16_t getVoltage()        { return power.bus_mV; }
-    uint16_t getCurrent()        { return power.bus_mA; }
-    uint16_t getPower()          { return power.bus_mW; }
-    uint16_t getLoadVoltage()    { return power.load_mV; }
-    uint16_t getBatteryVoltage() { return power.batt_mV; }
+    float getVoltage()        { return (float)power.bus_mV  / 1000.0f; }
+    float getCurrent()        { return (float)power.bus_mA  / 1000.0f; }
+    float getPower()          { return (float)power.bus_mW  / 1000.0f; }
+    float getLoadVoltage()    { return (float)power.load_mV / 1000.0f; }
+    float getBatteryVoltage() { return (float)power.batt_mV / 1000.0f; }
 
     void init() {
       ina219.setADCMode(INA219_SAMPLE_MODE_16);  // 16 sample average
@@ -64,7 +64,7 @@ class PowerSensor : public Sensor<PowerSample>
         Sensor::push(s);
         power = s;
 
-        Serial.printf(PSTR("Power %s %dmV, %dmA, %dmW, %dmV\n"), name, s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV);
+        Serial.printf(PSTR("Power %s bus %dmV, %dmA, %dmW load %dmV batt %dmV\n"), name, s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV, s.batt_mV);
       }
     }
 
