@@ -192,7 +192,6 @@ void onSwitchChange(int cur, int last)
 void onPumpChange(Pump& pump, uint8_t power)
 {
   Serial.printf(PSTR("%s set power to %d\n"), pump.getName(), power);
-  
   updateRightStatusLight();
   
   // wake up backlight when a pump is turned on
@@ -211,13 +210,14 @@ void onWaterLevelChange(const WaterLevel& level)
 
 // updates battery indicator
 void onBatteryLevelChange(const BatteryLevel& level) {
-
+  Serial.printf(PSTR("Battery level changed to %s\n"));
+  updateLeftStatusLight();
 }
 
 
 void updateRightStatusLight()
 {
-  static const EFunc slowPulseEffect = Effects::pulse(2300, 0.05);
+  static const EFunc slowPulseEffect = Effects::pulse(3000, 0.05);
   static const EFunc fastPulseEffect = Effects::pulse(1000, 0.05);
 
   if (pumps.isAllOff()) {
@@ -238,12 +238,21 @@ void updateRightStatusLight()
 
 void updateLeftStatusLight()
 {
-  static const EFunc connectingEffect = Effects::blink(1000,500);
+  static const EFunc connectEffect = Effects::blink(1000, 500);
+  static const EFunc flashEffect   = Effects::blink(100, 900);
+  static const EFunc pulseEffect   = Effects::pulse(2000);
+  static const EFunc blinkEffect   = Effects::blink(500, 500);
   
   if (WiFi.status() != WL_CONNECTED) {
-    lights.set(STATUS_LEFT, connectingEffect, CRGB::Orange);
+    lights.set(STATUS_LEFT, connectEffect, CRGB::Orange);
   } else {
-
+    switch(battery.getLevel().status) {
+      case BATT_CRITICAL:   lights.set(STATUS_LEFT, flashEffect, CRGB::Red);   break;
+      case BATT_LOW:        lights.set(STATUS_LEFT, pulseEffect, CRGB::Red);   break;
+      case BATT_CHARGING:   lights.set(STATUS_LEFT, pulseEffect, CRGB::Green); break;
+      case BATT_OVERCHARGE: lights.set(STATUS_LEFT, blinkEffect, CRGB::Red);   break;
+      default:              lights.set(STATUS_LEFT, Effects::off);             break;
+    }
   }
 }
 

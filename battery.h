@@ -39,6 +39,14 @@ class Battery
       onChange = cb;
     }
 
+    const BatteryLevel& getLevel() {
+      return levels[status];
+    }
+
+    const uint16_t getVoltage() {
+      return voltage_mV;
+    }
+
     void updateVoltage(uint16_t mV) {
       voltage_mV = mV;
 
