@@ -67,18 +67,13 @@ const char *version = "0.3";
 
 Lights<PIN_LEDS> lights;
 Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
-
 Battery battery;
 PowerSensor powerSensor("main_power", 0x41, 240);       // i2c devices on the same wires
 SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
-
 WaterLevelSensor<PIN_LEVEL> levelSensor("main_tank", 3600, 1000);
-
 DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp", 240, 2000);
 
-
-bool handleSysinfo()
-{
+bool handleSysinfo() {
   JsonDocument json;
 
   json["uptime"] = uptime_formatter::getUptime();
@@ -103,9 +98,7 @@ bool handleSysinfo()
   return http::sendJson(json);
 }
 
-
-void setupServer()
-{
+void setupServer() {
   // routes
   http::server.on("/",                      HTTP_GET,   []() { http::handleFile("/home.html");      });
   http::server.on("/settings",              HTTP_GET,   []() { http::handleFile("/settings.html");  });
@@ -130,9 +123,8 @@ void setupServer()
   Serial.println(PSTR("HTTP server started"));
 }
 
-
-void handleWiFiReconnect() 
-{
+// handle stupid unreliable wifi
+void handleWiFiReconnect() {
   // start true so we can trigger the warning light correctly
   static bool connected = true;
   
@@ -185,20 +177,16 @@ void handleWiFiReconnect()
   }
 }
 
-
 // switch controls the pump program
-void onSwitchChange(int cur, int last)
-{
+void onSwitchChange(int cur, int last) {
   Serial.printf(PSTR("Switch position changed from %d to %d\n"), last, cur);
   Mode mode = (Mode)(cur-1);
   pumps.setMode(mode);
   lights.wakeUp();
 }
 
-
 // turn light on with the pump
-void onPumpChange(Pump& pump, uint8_t power)
-{
+void onPumpChange(Pump& pump, uint8_t power) {
   Serial.printf(PSTR("%s set power to %d\n"), pump.getName(), power);
   updateRightStatusLight();
   
@@ -207,23 +195,20 @@ void onPumpChange(Pump& pump, uint8_t power)
     lights.wakeUp();
 }
 
-
-// updates level indicator
-void onWaterLevelChange(const WaterLevel& level)
-{
+// updates water level indicator
+void onWaterLevelChange(const WaterLevel& level) {
   Serial.printf(PSTR("Water level changed to %s %d%%\n"), level.name, level.percent);
   updateRightStatusLight();
 }
 
-
+// battery low can lock pump
 void onBatteryLevelChange(const BatteryLevel& level) {
   Serial.printf(PSTR("Battery level changed to %s\n"), level.name);
-
   updatePumpLockout();
   updateLeftStatusLight();
 }
 
-
+// lock / unlock pump
 void updatePumpLockout() {
   const float caseTemp = caseSensor.getSampleCount() ? caseSensor.getLastSample().temp_c  : 0.0f;
   const bool tooHot = caseTemp < 65.0f;
@@ -232,6 +217,8 @@ void updatePumpLockout() {
 
   if (!allow && !pumps.isLocked()) {
     pumps.lock();
+    lights.wakeUp();
+    
     Serial.println(PSTR("Pumps locked due to"));
     if (tooHot) Serial.printf(PSTR(" high internal case temperature (%.1f°C)"), caseTemp);
     if (lowPow) Serial.printf(PSTR(" low battery (%dmV)"), battery.getVoltage());
@@ -239,18 +226,13 @@ void updatePumpLockout() {
 
   } else if (allow && pumps.isLocked()) {
     pumps.unlock();
+    lights.wakeUp();
     Serial.println(PSTR("Pumps unlocked"));
   }
 }
 
-
-void onCaseTemperatureChange(const THSample& sample) {
-  updatePumpLockout();
-}
-
-
-void updateRightStatusLight()
-{
+// right status: Wifi, water level
+void updateRightStatusLight() {
   static const EFunc slowPulseEffect = Effects::pulse(3000, 0.05);
   static const EFunc fastPulseEffect = Effects::pulse(1000, 0.05);
 
@@ -267,9 +249,8 @@ void updateRightStatusLight()
   }
 }
 
-
-void updateLeftStatusLight()
-{
+// left status: pump activity, battery status
+void updateLeftStatusLight() {
   static const EFunc connectEffect = Effects::blink(1000, 500);
   static const EFunc flashEffect   = Effects::blink(100, 900);
   static const EFunc pulseEffect   = Effects::pulse(2000);
@@ -288,10 +269,9 @@ void updateLeftStatusLight()
   }
 }
 
-
 void setup()
 {
-  // not sure this is even working
+  // try to get a random seed
   pinMode(A0, INPUT);
   const uint32_t seed = analogRead(A0) % 16;
 
@@ -306,18 +286,19 @@ void setup()
   Serial.println(line);
   Serial.printf(PSTR("RNG seed is %d\n"), seed);
 
-  // set the switch light from switch position
+  // switch position sets the switch light
   lights.set(SWITCH, [](int i, uint32_t t) -> CRGB { 
     if (i == 4-swtch.getPos()) 
       return Effects::ON; 
     return Effects::ON % 4;
   }, Effects::PlasmaPurple);
 
-  // start light early
+  // turn on light early
   lights.set(BACKLIGHT, Effects::glitch(seed), Effects::PlasmaPurple);
   lights.init();
   lights.update(0);
 
+  // TODO littlefs
   Serial.print(PSTR("Initializing SPIFFS ... "));
   if (SPIFFS.begin()) {
     Serial.println(PSTR("ok"));
@@ -337,15 +318,22 @@ void setup()
   levelSensor.setOnChange(onWaterLevelChange);
   levelSensor.init();
 
+  battery.setOnChange(onBatteryLevelChange);
+
   powerSensor.setOnSample([](const PowerSample& sample) { 
     battery.updateVoltage(sample.bus_mV); 
   });
-  battery.setOnChange(onBatteryLevelChange);
 
-  // i2c sensors
+  caseSensor.setOnSample([](const THSample& _) { 
+    updatePumpLockout();
+  });
+
+  // i2c
   Wire.begin();
   powerSensor.init();
   caseSensor.init();
+  
+  // OneWire
   dallasSensors.init();
 
   initTimeZone();
