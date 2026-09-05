@@ -94,7 +94,7 @@ namespace Effects
     return x;
   }
 
-  // note: vibed this, just has to look nice
+  // VIBED just has to look nice
   EFunc glitch(uint32_t main_seed = 0, int numLeds = 26) {
     const uint32_t eventPeriod = 4200;        // ms between possible dropout events
     const uint32_t eventLen = 600;            // how long a dropout event lasts

@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <INA219_WE.h>
 #include "sensor.h"
+#include "utils.h"
 
 
 struct PowerSample {
@@ -10,6 +11,7 @@ struct PowerSample {
   uint16_t bus_mA;
   uint16_t bus_mW;
   uint16_t load_mV;
+  uint16_t batt_mV;
 };
 
 class PowerSensor : public Sensor<PowerSample>
@@ -29,21 +31,11 @@ class PowerSensor : public Sensor<PowerSample>
       ina219(INA219_WE(addr))
     {}
 
-    uint16_t getVoltage() {
-      return power.bus_mV;
-    }
-
-    uint16_t getCurrent() {
-      return power.bus_mA;
-    }
-
-    uint16_t getPower() {
-      return power.bus_mW;
-    }
-
-    uint16_t getLoadVoltage() {
-      return power.load_mV;
-    }
+    uint16_t getVoltage()        { return power.bus_mV; }
+    uint16_t getCurrent()        { return power.bus_mA; }
+    uint16_t getPower()          { return power.bus_mW; }
+    uint16_t getLoadVoltage()    { return power.load_mV; }
+    uint16_t getBatteryVoltage() { return power.batt_mV; }
 
     void init() {
       ina219.setADCMode(INA219_SAMPLE_MODE_16);  // 16 sample average
@@ -67,6 +59,7 @@ class PowerSensor : public Sensor<PowerSample>
         s.bus_mA  = ina219.getCurrent_mA();
         s.bus_mW  = ina219.getBusPower();
         s.load_mV = ina219.getBusVoltage_V() * 1000.0 + ina219.getShuntVoltage_mV();
+        s.batt_mV = s.bus_mV + calc1N5822ForwardVoltage(s.bus_mA);
 
         Sensor::push(s);
         power = s;

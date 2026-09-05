@@ -24,7 +24,7 @@ class Battery
 
     Battery() : 
       voltage_mV(0),
-      tolerance_mV(200),
+      hysteresis_mV(200),
       levels{{ BATT_CRITICAL,   "critical"  , 10000 },
              { BATT_LOW,        "low"       , 11800 },
              { BATT_OK,         "ok"        , 13700 },
@@ -47,6 +47,30 @@ class Battery
       return voltage_mV;
     }
 
+    const uint8_t getCharge() {
+      uint32_t v = voltage_mV;
+      uint32_t p;
+
+      // Below 11.6V
+      if (v <= 11600) {
+          p = 0;
+      }
+      // 11.6V to 12.2V
+      else if (v <= 12200) {
+          p = ((v - 11600) * 50) / 600;
+      }
+      // 12.2V to 12.85V
+      else if (v <= 12850) {
+          p = 50 + ((v - 12200) * 50) / 650;
+      }
+      // Above 12.85V
+      else {
+          p = 100;
+      }
+
+      return (uint8_t)p;
+    }
+
     void updateVoltage(uint16_t mV) {
       voltage_mV = mV;
 
@@ -56,14 +80,14 @@ class Battery
 
       // find new level upwards
       bool changed = false;
-      while (s < 4 && mV > level.mV + tolerance_mV) {
+      while (s < 4 && mV > level.mV + hysteresis_mV) {
         s++;
         changed = true;
       }
 
       // find new level downwards
       if (!changed) {
-        while (s > 0 && mV < level.mV - tolerance_mV) {
+        while (s > 0 && mV < level.mV - hysteresis_mV) {
           s--;
           changed = true;
         }
@@ -79,7 +103,7 @@ class Battery
   private:
 
     uint16_t voltage_mV;
-    const uint16_t tolerance_mV;
+    const uint16_t hysteresis_mV;
 
     const BatteryLevel levels[5];
 

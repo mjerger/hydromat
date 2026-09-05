@@ -77,3 +77,30 @@ const String getWiFiStatus() {
     default:                  return F("WiFi.status() = ") + String(status);
   }
 }
+
+
+// VIBED
+// approximate 1N5822 schotky diode forward voltage
+uint16_t calc1N5822ForwardVoltage(uint16_t mA) {
+    uint32_t i = mA;
+    uint32_t v;
+
+    // 0 to 100 mA
+    if (i <= 100) {
+        v = (i * 28) / 10;
+    } 
+    // 100 to 1000 mA
+    else if (i <= 1000) {
+        v = 280 + ((i - 100) * 120) / 900;
+    } 
+    // 1000 to 3000 mA
+    else if (i <= 3000) {
+        v = 400 + ((i - 1000) * 100) / 2000;
+    } 
+    // Above 3000 mA (Overload)
+    else {
+        v = 500 + ((i - 3000) * 5) / 100;
+    }
+
+    return (uint16_t)v;
+}

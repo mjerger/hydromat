@@ -210,7 +210,17 @@ void onWaterLevelChange(const WaterLevel& level)
 
 // updates battery indicator
 void onBatteryLevelChange(const BatteryLevel& level) {
-  Serial.printf(PSTR("Battery level changed to %s\n"));
+  Serial.printf(PSTR("Battery level changed to %s\n"), level.name);
+
+  // lock pumps on low voltage
+  if (level.status == BATT_CRITICAL && !pumps.isLocked()) {
+    pumps.lock();
+    Serial.printf(PSTR("Pumps locked due to critically low battery (%dmV)\n"), battery.getVoltage());
+  } else if (pumps.isLocked()) {
+    pumps.unlock();
+    Serial.println(PSTR("Pumps unlocked"));
+  }
+
   updateLeftStatusLight();
 }
 
@@ -220,7 +230,9 @@ void updateRightStatusLight()
   static const EFunc slowPulseEffect = Effects::pulse(3000, 0.05);
   static const EFunc fastPulseEffect = Effects::pulse(1000, 0.05);
 
-  if (pumps.isAllOff()) {
+  if (pumps.isRunning()) {
+    lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Blue);
+  } else { 
     auto& level = levelSensor.getLevel();
     switch (level.percent) {
       case  25: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::Red);    break; // too low
@@ -228,10 +240,6 @@ void updateRightStatusLight()
       case 100: lights.set(STATUS_RIGHT, Effects::on, CRGB::Orange);     break; // maximum
       default:  lights.set(STATUS_RIGHT, Effects::off);
     }
-
-  } else {
-    // pumping
-    lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Blue);
   }
 }
 

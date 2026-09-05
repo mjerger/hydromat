@@ -32,13 +32,20 @@ class Pump
       pin(pin), 
       max_power(200),
       onChange(cb),
+      enabled(false),
+      power(0),
+      remaining_ms(0),
+      duration_ms(0),
       sensor(name)
     {}
+    
+    const char* getName()   const { return name; }
+    uint8_t     getPower()  const { return power; }
+    const auto& getSensor() const { return sensor; }
 
-    const char* getName()   { return name; }
-    uint8_t     getPower()  { return power; }
-    const auto& getSensor() { return sensor; }
-
+    void enable()  { enabled = true; }
+    void disable() { enabled = false; turnOff(); }
+  
     void init() {
       pinMode(pin, OUTPUT);
       digitalWrite(pin, 0);
@@ -56,8 +63,11 @@ class Pump
         Serial.printf(PSTR("Turn off %s after %dms\n"), name, runtime_ms);
       }
     }
-
+    
     void turnOnFor(int seconds, uint8_t pwr) {
+      if (!enabled)
+        return;
+
       const uint8_t p = pwr ? pwr < max_power ? pwr : max_power : max_power;
       setPower(p);
 
@@ -73,20 +83,28 @@ class Pump
     }
 
     void setPower(uint8_t pwr) {
-      power = pwr > max_power ? max_power : pwr;;
-      analogWrite(pin, power);
+      if (!enabled && pwr)
+        return;
+      
+      power = pwr > max_power ? max_power : pwr;
+      output(power);
       sensor.push(pwr);
       if (onChange)
         onChange(*this, power);
     }
 
   private:
+    void output(uint8_t value) {
+      analogWrite(pin, value);
+    }
+
     const char* name;
     const uint8_t pin;
     const uint8_t max_power;
 
     const OnChange onChange;
     
+    bool enabled;
     uint8_t power;
     uint32_t remaining_ms;
     uint32_t duration_ms;
@@ -94,7 +112,6 @@ class Pump
     Sensor<uint8_t> sensor;
 };
 
-// hmmmm
 #define for_each(dev) \
   for (auto& device : devices) \
     if (device) \
@@ -124,7 +141,6 @@ struct Device : Pump
   {}
   
   const char* id;
-
   Program programs[2][10];
 };
 
@@ -133,7 +149,10 @@ struct Device : Pump
 class Pumps
 {
   public:
-    Pumps() : mode(PUMP_OFF) {}
+    Pumps() : 
+      mode(PUMP_OFF),
+      locked(false)
+    {}
 
     void init() {
       for_each(pump) {
@@ -179,11 +198,11 @@ class Pumps
     }
 
     // is any pump running?
-    const bool isAllOff() {
+    bool isRunning() const {
       for_each(pump)
         if (pump.getPower())
-          return false;
-      return true;
+          return true;
+      return false;
     }
 
     // set mode of all pumps
@@ -225,17 +244,22 @@ class Pumps
       }
     }
 
-    // set power of all pumps
-    void turnOnFor(int seconds, uint8_t pwr) {
+    bool isLocked() const { 
+      return locked; 
+    }
+
+    void lock() {
+      locked = true;
       for_each(pump)
-        pump.turnOnFor(seconds, pwr);
+        pump.disable();
     }
 
-    void turnOff() {
-      for_each(pump) 
-        pump.turnOff();
+    void unlock() {
+      locked = false;
+      for_each(pump)
+        pump.enable();
     }
-
+    
     static void onCronTriggered() { 
       pumps.onCronTriggeredImpl();
     }
@@ -244,6 +268,7 @@ class Pumps
 
     Mode mode;
     std::array<std::optional<Device>, 2> devices;
+    bool locked;
 
     void onCronTriggeredImpl() {
 
@@ -266,6 +291,7 @@ class Pumps
           }
         }
       }
+
       Serial.println("but was ignored ??");
     }
 };
