@@ -343,8 +343,6 @@ void setup() {
   // connect to WIFI
   Serial.printf(PSTR("Connecting to %s\n"), secrets::wifi_ssid);
   WiFi.mode(WIFI_STA);
-  WiFi.persistent(false);
-  WiFi.setAutoReconnect(true);
   WiFi.setHostname(hostname);
   WiFi.begin(secrets::wifi_ssid, secrets::wifi_pwd);
 

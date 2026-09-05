@@ -24,7 +24,7 @@ class Battery
 
     Battery() : 
       voltage_mV(0),
-      hysteresis_mV(150),
+      hysteresis_mV(50),
       levels{{ BATT_CRITICAL,   "critical"  , 11000 },
              { BATT_LOW,        "low"       , 11800 },
              { BATT_OK,         "ok"        , 13700 },
