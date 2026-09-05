@@ -1,5 +1,15 @@
 /* 
- *  Hydromat 2000
+ * Hydromat 2000
+ *
+ * Libraries used
+ *   Arduino esp8266    3.1.2
+ *   ArduinoJson        7.4.3   https://arduinojson.org/
+ *   Uptime Library     1.0.0   https://github.com/YiannisBourkelis/Uptime-Library
+ *   CronAlarms         0.1.0   https://github.com/Martin-Laclaustra/CronAlarms
+ *   FastLED            3.10.5  https://github.com/fastled/fastled
+ *   INA219_WE          1.4.1   https://github.com/wollewald/INA219_WE
+ *   DallasTemperature  4.0.6   https://github.com/milesburton/Arduino-Temperature-Control-Library
+ *   CircularBuffer     1.4.0   https://github.com/rlogiacco/CircularBuffer
  */
 
 #include <Arduino.h>
@@ -9,14 +19,12 @@
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <uri/UriRegex.h>
-#include <FS.h>
 #include <ArduinoJson.h>
 #include <base64.h>
 #include <uptime.h>
 #include <uptime_formatter.h>
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.h"
-#include <CircularBuffer.hpp>
 #include <CronAlarms.h>
 #include <Wire.h>
 
@@ -104,7 +112,7 @@ void setupServer()
   //server.on("/config",                HTTP_ANY,   []() { handleConfig(server);  });
   http::server.on("/sysinfo",               HTTP_GET,   []() { handleSysinfo();  });
   //server.on(UriRegex("/tds/(.*)"),    HTTP_GET,   []() { handleTDS(server.pathArg(0));  });
-  
+
   // we use our own routing hacky hack
   http::server.onNotFound([]() {
     Serial.print(http::methods[http::server.method()] + " -> " + http::server.uri());
@@ -208,20 +216,36 @@ void onWaterLevelChange(const WaterLevel& level)
 }
 
 
-// updates battery indicator
 void onBatteryLevelChange(const BatteryLevel& level) {
   Serial.printf(PSTR("Battery level changed to %s\n"), level.name);
 
-  // lock pumps on low voltage
-  if (level.status == BATT_CRITICAL && !pumps.isLocked()) {
+  updatePumpLockout();
+  updateLeftStatusLight();
+}
+
+
+void updatePumpLockout() {
+  const float caseTemp = caseSensor.getSampleCount() ? caseSensor.getLastSample().temp_c  : 0.0f;
+  const bool tooHot = caseTemp < 65.0f;
+  const bool lowPow = battery.getLevel().status == BATT_CRITICAL;
+  const bool allow = !tooHot && !lowPow;
+
+  if (!allow && !pumps.isLocked()) {
     pumps.lock();
-    Serial.printf(PSTR("Pumps locked due to critically low battery (%dmV)\n"), battery.getVoltage());
-  } else if (pumps.isLocked()) {
+    Serial.println(PSTR("Pumps locked due to"));
+    if (tooHot) Serial.printf(PSTR(" high internal case temperature (%.1f°C)"), caseTemp);
+    if (lowPow) Serial.printf(PSTR(" low battery (%dmV)"), battery.getVoltage());
+    Serial.println();
+
+  } else if (allow && pumps.isLocked()) {
     pumps.unlock();
     Serial.println(PSTR("Pumps unlocked"));
   }
+}
 
-  updateLeftStatusLight();
+
+void onCaseTemperatureChange(const THSample& sample) {
+  updatePumpLockout();
 }
 
 
@@ -265,8 +289,8 @@ void updateLeftStatusLight()
 }
 
 
-void setup() 
-{ 
+void setup()
+{
   // not sure this is even working
   pinMode(A0, INPUT);
   const uint32_t seed = analogRead(A0) % 16;
@@ -347,14 +371,14 @@ void loop(void)
   MDNS.update();
 
   Cron.delay();
-  
+
   // loop timing
   static uint32_t last = 0;
   const uint32_t now = millis();
   if (!last) last = now;
   const uint32_t dt = now - last;
   last = now;
-  
+
   swtch.update();
   pumps.update(dt);
   powerSensor.update(dt);

@@ -4,15 +4,16 @@
 #include <CircularBuffer.hpp>
 #include <time.h>
 
+template<typename sample_type>
+struct Sample {
+  uint32_t time;
+  sample_type val;
+};
+    
 template<typename sample_type, size_t size=256>
 class Sensor
 {
   public:
-
-    struct Sample {
-      uint32_t time;
-      sample_type val;
-    };
     
     Sensor (const char* name) : name(name) {}
 
@@ -22,15 +23,23 @@ class Sensor
       onSample = cb;
     }
 
-    const char* getName() { 
+    const char* getName() const { 
       return name; 
+    }
+
+    const sample_type& getLastSample() const {
+      return buffer.last().val;
+    }
+
+    uint16_t getSampleCount() const {
+      return buffer.size();
     }
 
     void push(const sample_type& value) {
       time_t now;
       time(&now);
 
-      const Sample& s = {now, value};
+      const Sample<sample_type>& s = {now, value};
       buffer.push(s);
 
       if (onSample)
@@ -40,7 +49,7 @@ class Sensor
   protected:
   
     const char* name;
-    CircularBuffer<Sample, size> buffer;
+    CircularBuffer<Sample<sample_type>, size> buffer;
 
     OnSample onSample = nullptr;
 };
