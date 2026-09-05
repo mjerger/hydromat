@@ -6,28 +6,44 @@
 
 
 struct PowerSample {
-  int bus_mV;
-  int bus_mA;
-  int bus_mW;
-  int load_mV;
+  uint16_t bus_mV;
+  uint16_t bus_mA;
+  uint16_t bus_mW;
+  uint16_t load_mV;
 };
 
-class PowerSensor : Sensor<PowerSample>
+class PowerSensor : public Sensor<PowerSample>
 {
   public:
 
-    PowerSensor(
+    PowerSensor (
       const char* name = "power",
       uint8_t     addr = 0x40,
       uint32_t    samples_per_hour = 240,
-      uint32_t    offset_ms = 0)
-    : 
+      uint32_t    offset_ms = 0
+    ) : 
       Sensor(name),
       i2c_addr(addr),
       sample_ms(3600000 / samples_per_hour),
       sample_offset_ms(offset_ms),
       ina219(INA219_WE(addr))
     {}
+
+    uint16_t getVoltage() {
+      return power.bus_mV;
+    }
+
+    uint16_t getCurrent() {
+      return power.bus_mA;
+    }
+
+    uint16_t getPower() {
+      return power.bus_mW;
+    }
+
+    uint16_t getLoadVoltage() {
+      return power.load_mV;
+    }
 
     void init() {
       ina219.setADCMode(INA219_SAMPLE_MODE_16);  // 16 sample average
@@ -53,16 +69,20 @@ class PowerSensor : Sensor<PowerSample>
         s.load_mV = ina219.getBusVoltage_V() * 1000.0 + ina219.getShuntVoltage_mV();
 
         Sensor::push(s);
+        power = s;
 
         Serial.printf(PSTR("Power %s %dmV, %dmA, %dmW, %dmV\n"), name, s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV);
       }
     }
+
 
   private:
 
     const uint8_t  i2c_addr;
     const uint32_t sample_ms;
     const uint32_t sample_offset_ms;
-    
+
     INA219_WE ina219;
+
+    PowerSample power;
 };

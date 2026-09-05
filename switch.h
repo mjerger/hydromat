@@ -13,7 +13,7 @@ class Switch
 
     typedef void (*OnChange)(int current, int last);
 
-    void hookOnChange(OnChange cb) {
+    void setOnChange(OnChange cb) {
       onChange = cb;
     }
 

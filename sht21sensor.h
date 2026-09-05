@@ -18,8 +18,8 @@ class SHT21Sensor : public Sensor<THSample>
       const char* name = "temp",
       uint8_t     addr = 0x40,
       uint32_t    samples_per_hour = 240,
-      uint32_t    offset_ms = 0)
-    : 
+      uint32_t    offset_ms = 0
+    ) :
       Sensor(name),
       i2c_addr(addr),
       sample_ms(3600000 / samples_per_hour),

@@ -23,7 +23,11 @@ class Pump
   public:
     typedef void (*OnChange)(Pump&, uint8_t power);
 
-    Pump(const char* name, uint8_t pin, OnChange cb) :
+    Pump(
+      const char* name,
+      uint8_t pin,
+      OnChange cb
+    ) :
       name(name), 
       pin(pin), 
       max_power(200),

@@ -34,9 +34,10 @@
 #include "pumps.h"
 #include "switch.h"
 #include "lights.h"
+#include "battery.h"
 #include "powersensor.h"
 #include "sht21sensor.h"
-#include "levelsensor.h"
+#include "waterlevelsensor.h"
 #include "dallassensors.h"
 
 #include "secrets.h"
@@ -59,10 +60,11 @@ const char *version = "0.3";
 Lights<PIN_LEDS> lights;
 Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
 
+Battery battery;
 PowerSensor powerSensor("main_power", 0x41, 240);       // i2c devices on the same wires
 SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
 
-LevelSensor<PIN_LEVEL> levelSensor("main_tank", 3600, 1000);
+WaterLevelSensor<PIN_LEVEL> levelSensor("main_tank", 3600, 1000);
 
 DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp", 240, 2000);
 
@@ -126,9 +128,8 @@ void handleWiFiReconnect()
   // start true so we can trigger the warning light correctly
   static bool connected = true;
   
-  static const EFunc connectingEffect = Effects::blink(1000,500);
   static const EFunc connectedEffect  = Effects::fadeOutAfter(4200, 6400);
-  static const EFunc disconnectEffect = Effects::blink(500,500);
+  static const EFunc disconnectEffect = Effects::fadeOutAfter(4200, 6400);
 
   if (WiFi.status() != WL_CONNECTED) {
 
@@ -141,14 +142,12 @@ void handleWiFiReconnect()
     
     if (connected) {
       connected = false;
-      
-      // after startup or disconnect
-      lights.set(STATUS_LEFT, connectingEffect, CRGB::Orange); 
+      updateLeftStatusLight();
     }
 
     if (now - last_ms > 15000) {
       // every 15secs (synced to 10 pulses) to reset the reconnecting effect
-      lights.set(STATUS_LEFT, connectingEffect, CRGB::Orange); 
+      updateLeftStatusLight();
       Serial.printf(PSTR("WiFi error: %s\n"), getWiFiStatus().c_str());
       last_ms = now;
     }
@@ -179,6 +178,76 @@ void handleWiFiReconnect()
 }
 
 
+// switch controls the pump program
+void onSwitchChange(int cur, int last)
+{
+  Serial.printf(PSTR("Switch position changed from %d to %d\n"), last, cur);
+  Mode mode = (Mode)(cur-1);
+  pumps.setMode(mode);
+  lights.wakeUp();
+}
+
+
+// turn light on with the pump
+void onPumpChange(Pump& pump, uint8_t power)
+{
+  Serial.printf(PSTR("%s set power to %d\n"), pump.getName(), power);
+  
+  updateRightStatusLight();
+  
+  // wake up backlight when a pump is turned on
+  if (power)
+    lights.wakeUp();
+}
+
+
+// updates level indicator
+void onWaterLevelChange(const WaterLevel& level)
+{
+  Serial.printf(PSTR("Water level changed to %s %d%%\n"), level.name, level.percent);
+  updateRightStatusLight();
+}
+
+
+// updates battery indicator
+void onBatteryLevelChange(const BatteryLevel& level) {
+
+}
+
+
+void updateRightStatusLight()
+{
+  static const EFunc slowPulseEffect = Effects::pulse(2300, 0.05);
+  static const EFunc fastPulseEffect = Effects::pulse(1000, 0.05);
+
+  if (pumps.isAllOff()) {
+    auto& level = levelSensor.getLevel();
+    switch (level.percent) {
+      case  25: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::Red);    break; // too low
+      case  50: lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Yellow); break; // minimum
+      case 100: lights.set(STATUS_RIGHT, Effects::on, CRGB::Orange);     break; // maximum
+      default:  lights.set(STATUS_RIGHT, Effects::off);
+    }
+
+  } else {
+    // pumping
+    lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Blue);
+  }
+}
+
+
+void updateLeftStatusLight()
+{
+  static const EFunc connectingEffect = Effects::blink(1000,500);
+  
+  if (WiFi.status() != WL_CONNECTED) {
+    lights.set(STATUS_LEFT, connectingEffect, CRGB::Orange);
+  } else {
+
+  }
+}
+
+
 void setup() 
 { 
   // not sure this is even working
@@ -188,7 +257,7 @@ void setup()
   #ifdef SERIAL_ENABLED
     Serial.begin(115200);
   #endif
-  
+
   // banner
   const char* line = PSTR("----------------------------");
   Serial.printf(PSTR("\n\n\n%s\n hydromat %s       by manu\n"), line, version);
@@ -196,46 +265,17 @@ void setup()
   Serial.println(line);
   Serial.printf(PSTR("RNG seed is %d\n"), seed);
 
-  // start with lights on
+  // set the switch light from switch position
   lights.set(SWITCH, [](int i, uint32_t t) -> CRGB { 
     if (i == 4-swtch.getPos()) 
       return Effects::ON; 
     return Effects::ON % 4;
   }, Effects::PlasmaPurple);
 
+  // start light early
   lights.set(BACKLIGHT, Effects::glitch(seed), Effects::PlasmaPurple);
   lights.init();
   lights.update(0);
-
-  // turn light on only when a pump is on
-  static const EFunc pumpPulseEffect = Effects::pulse(2300, 0.05);
-  auto onPumpChange = [](Pump& pump, uint8_t power) { 
-    Serial.printf(PSTR("%s set power %d\n"), pump.getName(), power);
-    if (!power && pumps.isAllOff())
-      lights.set(STATUS_RIGHT, Effects::off);
-    else {
-      lights.set(STATUS_RIGHT, pumpPulseEffect, CRGB::Blue);
-      lights.wakeUp();
-    }
-  };
-
-  // two pumps
-  pumps.add("pump_a", "Main Pump", PIN_PUMP_A, onPumpChange);
-  pumps.add("pump_b", "Aux Pump" , PIN_PUMP_B, onPumpChange);
-
-  // switch sets the pump's program
-  swtch.hookOnChange([](int cur, int last) { 
-    Serial.printf(PSTR("Switch pos %d -> %d\n"), last, cur);
-    Mode mode = (Mode)(cur-1);
-    pumps.setMode(mode);
-    lights.wakeUp();
-  });
-
-  // react when water level changes
-  levelSensor.hookOnChange([](const Level& level) { 
-    Serial.printf(PSTR("Level changed to %s %d%%\n"), level.name, level.percent);
-    // TODO
-  });
 
   Serial.print(PSTR("Initializing SPIFFS ... "));
   if (SPIFFS.begin()) {
@@ -245,11 +285,21 @@ void setup()
     lights.errorLoop();
   }
 
+  // loads from fs
   config.load();
 
   pumps.init();
+
+  swtch.setOnChange(onSwitchChange);
   swtch.init();
+
+  levelSensor.setOnChange(onWaterLevelChange);
   levelSensor.init();
+
+  powerSensor.setOnSample([](const PowerSample& sample) { 
+    battery.updateVoltage(sample.bus_mV); 
+  });
+  battery.setOnChange(onBatteryLevelChange);
 
   // i2c sensors
   Wire.begin();

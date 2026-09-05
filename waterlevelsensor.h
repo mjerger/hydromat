@@ -3,43 +3,50 @@
 #include "sensor.h"
 
 
-class Level {
+class WaterLevel 
+{
   public:
-    const char* name;
+    const char*    name;
     const uint16_t raw;
-    const uint8_t percent;
+    const uint8_t  percent;
 };
 
 
-struct LevelSample {
+struct WaterLevelSample 
+{
   uint16_t raw;
   uint8_t level;
 };
 
 
 template<uint8_t APIN = A0>
-class LevelSensor : Sensor<LevelSample>
+class WaterLevelSensor : public Sensor<WaterLevelSample>
 {
   public:
 
-    LevelSensor(
+    WaterLevelSensor(
       const char* name = "level",
       uint32_t    samples_per_hour = 3600,
-      uint32_t    offset_ms = 0)
-    : 
+      uint32_t    offset_ms = 0
+    ) : 
       Sensor(name),
       sample_ms(3600000 / samples_per_hour),
       sample_offset_ms(offset_ms),
       levels {{"too_low",    0,  25},
               {"minimum",  350,  50},
-              {"normal",   600,  70},
-              {"maximum", 1000, 100}}
+              {"normal",   600,  75},
+              {"maximum", 1000, 100}},
+      level(-1)
     {}
 
-    typedef void (*OnChange)(const Level& level);
+    typedef void (*OnChange)(const WaterLevel& level);
 
-    void hookOnChange(OnChange cb) {
+    void setOnChange(OnChange cb) {
       onChange = cb;
+    }
+
+    const WaterLevel& getLevel() {
+      return levels[level];
     }
 
     void init() {
@@ -53,7 +60,7 @@ class LevelSensor : Sensor<LevelSample>
       if (last >= sample_ms) {
         last -= sample_ms * (last / sample_ms);
 
-        LevelSample s;
+        WaterLevelSample s;
         
         // TODO? maybe sample a few times?
         s.raw = analogRead(APIN);
@@ -67,26 +74,26 @@ class LevelSensor : Sensor<LevelSample>
           }
         }
 
-        // level changed?
-        const bool changed = buffer.isEmpty() || s.level != buffer.last().val.level;
-          
         Sensor::push(s);
 
-        if (changed && onChange) {
-          onChange(levels[s.level]);
-
-          Serial.printf(PSTR("Level %s %d %s %d%% (%d raw)\n"), name, s.level, levels[s.level].name, levels[s.level].percent, s.raw);
+        if (s.level != level && onChange) {
+          const WaterLevel& l = levels[s.level];
+          onChange(l);
+          Serial.printf(PSTR("Level %s %d %s %d%% (%d raw)\n"), name, s.level, l.name, l.percent, s.raw);
         }
 
+        level = s.level;
       }
     }
-    
-  private:
 
-    const Level levels[4];
+
+  private:
 
     const uint32_t sample_ms;
     const uint32_t sample_offset_ms;
+
+    const WaterLevel levels[4];
+    uint8_t level;
 
     OnChange onChange = nullptr;
 };
