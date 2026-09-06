@@ -22,14 +22,22 @@ class PowerSensor : public Sensor<PowerSample>
     PowerSensor (
       const char* name = "power",
       uint8_t     addr = 0x40,
+      uint32_t    update_ms = 1000,
       uint32_t    samples_per_hour = 240,
       uint32_t    offset_ms = 0
     ) : 
       Sensor(name),
       i2c_addr(addr),
-      timer(3600000 / samples_per_hour, true, offset_ms),
+      updateTimer(update_ms, true, offset_ms),
+      sampleTimer(3600000 / samples_per_hour, true, offset_ms),
       ina219(INA219_WE(addr))
     {}
+
+    typedef void (*OnUpdate)(const PowerSample& val);
+
+    void setOnUpdate(OnUpdate cb) {
+      onUpdate = cb;
+    }
 
     float busVoltage()     { return (float)power.bus_mV  / 1000.0f; }
     float busCurrent()     { return (float)power.bus_mA  / 1000.0f; }
@@ -43,14 +51,18 @@ class PowerSensor : public Sensor<PowerSample>
       ina219.setBusRange(INA219_BRNG_32);
 
       if (ina219.init()) {
-        timer.start();
+        updateTimer.start();
+        sampleTimer.start();
       } else {
         Serial.printf(PSTR("Failed to init ina219 current sensor on i2c address %s\n"), String(i2c_addr, 16).c_str());
       }
     }
 
     void update(uint32_t ms) {
-      if (timer.update(ms)) {
+      updateTimer.update(ms);
+      sampleTimer.update(ms);
+
+      if (updateTimer.ticked() || sampleTimer.ticked()) {
 
         PowerSample s;
         s.bus_mV  = ina219.getBusVoltage_V() * 1000.0;
@@ -58,21 +70,27 @@ class PowerSensor : public Sensor<PowerSample>
         s.bus_mW  = ina219.getBusPower();
         s.load_mV = ina219.getBusVoltage_V() * 1000.0 + ina219.getShuntVoltage_mV();
         s.batt_mV = s.bus_mV + calc1N5822ForwardVoltage(s.bus_mA);
-
-        Sensor::push(s);
         power = s;
 
-        Serial.printf(PSTR("Power %s bus %dmV, %dmA, %dmW load %dmV batt %dmV\n"), sensorName(), s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV, s.batt_mV);
+        if (onUpdate)
+          onUpdate(power);
+
+        if (sampleTimer.ticked()) {
+          Sensor::push(s);
+          Serial.printf(PSTR("Power %s bus %dmV, %dmA, %dmW load %dmV batt %dmV\n"), sensorName(), s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV, s.batt_mV);
+        }
       }
     }
-
 
   private:
 
     const uint8_t  i2c_addr;
-    Timer timer;
+    Timer sampleTimer;
+    Timer updateTimer;
 
     INA219_WE ina219;
 
     PowerSample power;
+
+    OnUpdate onUpdate = nullptr;
 };

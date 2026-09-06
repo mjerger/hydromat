@@ -284,8 +284,12 @@ class Pumps
         for (int i=0; i<10; i++) {
           auto& prog = pump.programs[program][i];
           if (prog.id == id) {
-            Serial.printf("pump %s\n",pump.id);
-            pump.turnOnFor(prog.duration, prog.power);
+            Serial.print(pump.id);
+            if (locked)
+              Serial.print(" but it is locked");
+            else
+              pump.turnOnFor(prog.duration, prog.power);
+            Serial.println();
             return;
           }
         }

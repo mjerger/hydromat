@@ -68,8 +68,8 @@ const char *version = "0.3";
 Lights<PIN_LEDS> lights;
 Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
 Battery battery;
-PowerSensor powerSensor("main_power", 0x41, 360);       // i2c devices on the same wires
-SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
+PowerSensor powerSensor("main_power", 0x41, 1000, 360, 0);
+SHT21Sensor caseSensor ("case_temp",  0x40,  60, 500); // 500ms before powersensor
 WaterLevelSensor<PIN_LEVEL> waterLevelSensor("main_tank", 3600, 1000);
 DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp", 240, 2000);
 
@@ -251,7 +251,7 @@ void updateRightStatusLight() {
 void updateLeftStatusLight() {
   static const EFunc connectEffect = Effects::blink(1000, 500);
   static const EFunc flashEffect   = Effects::blink(100, 900);
-  static const EFunc pulseEffect   = Effects::pulse(2000);
+  static const EFunc pulseEffect   = Effects::pulse(4000, 0.1);
   static const EFunc blinkEffect   = Effects::blink(500, 500);
   
   if (WiFi.status() != WL_CONNECTED) {
@@ -347,7 +347,7 @@ void setup() {
 
   battery.setOnChange(onBatteryLevelChange);
 
-  powerSensor.setOnSample([](const PowerSample& sample) { 
+  powerSensor.setOnUpdate([](const PowerSample& sample) {
     // inaccurate when pumps are running
     if (!pumps.isRunning())
       battery.updateVoltage(sample.batt_mV); 
