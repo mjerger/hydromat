@@ -6,12 +6,17 @@ class Timer
 {
   public:
 
-    Timer(uint32_t ms, bool repeat = false) : 
+    Timer(
+      uint32_t ms,
+      bool repeat = false,
+      uint32_t offset_ms = 0
+    ) : 
       interval_ms(ms),
       repeat(repeat),
+      offset_ms(offset_ms),
+      t(offset_ms),
       running(true),
-      tick(false),
-      t(0)
+      tick(false)
     {}
 
     bool update(uint32_t ms) {
@@ -23,6 +28,7 @@ class Timer
       tick = false;
       
       if (t >= interval_ms) {
+        // skip ticks when we stalled
         if (repeat)
           t -= interval_ms * (t / interval_ms);
         else
@@ -62,7 +68,7 @@ class Timer
     }
 
     void reset() {
-      t = 0;
+      t = offset_ms;
       tick = false;
     }
 
@@ -75,8 +81,9 @@ class Timer
   
     const uint32_t interval_ms;
     const bool repeat;
+    const uint32_t offset_ms;
+    uint32_t t;
     bool running;
     bool tick;
-    uint32_t t;
 };
 

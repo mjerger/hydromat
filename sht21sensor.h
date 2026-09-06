@@ -2,6 +2,7 @@
 
 #include <Wire.h>
 #include "sensor.h"
+#include "timer.h"
 
 
 struct THSample {
@@ -22,19 +23,18 @@ class SHT21Sensor : public Sensor<THSample>
     ) :
       Sensor(name),
       i2c_addr(addr),
-      sample_ms(3600000 / samples_per_hour),
-      sample_offset_ms(offset_ms)
+      timer(3600000 / samples_per_hour, true, offset_ms)
     {}
 
     float temperature() { return temp_c;    }
     float humidity()    { return humid_rel; }
 
-    void update(uint32_t ms) {
-      static uint32_t last = sample_offset_ms;
-      last += ms;
+    void init() {
+      timer.start();
+    }
 
-      if (last >= sample_ms) {
-        last -= sample_ms * (last / sample_ms);
+    void update(uint32_t ms) {
+      if (timer.update(ms)) {
 
         // TODO? handle errors?
         temp_c = readT();
@@ -80,8 +80,7 @@ class SHT21Sensor : public Sensor<THSample>
     }
 
     const uint8_t  i2c_addr;
-    const uint32_t sample_ms;
-    const uint32_t sample_offset_ms;
+    Timer timer;
     
     const bool hold_master = true; // block i2c while taking reading (?)
 

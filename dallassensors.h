@@ -3,6 +3,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include "sensor.h"
+#include "timer.h"
+
 
 class DallasSensor : public Sensor<float> 
 {
@@ -33,8 +35,7 @@ class DallasSensors
       uint32_t    offset_ms = 0)
     : 
       name(name),
-      sample_ms(3600000 / samples_per_hour),
-      sample_offset_ms(offset_ms),
+      timer(3600000 / samples_per_hour, true, offset_ms),
       wire(PIN),
       dallas(&wire)
     { }
@@ -72,19 +73,18 @@ class DallasSensors
             }
         }
       }
+
+      if (numFound > 0)
+        timer.start();
     }
 
     void update(uint32_t ms) {
-      static uint32_t last = sample_offset_ms;
-      last += ms;
-
-      if (last >= sample_ms) {
-        last -= sample_ms * (last / sample_ms);
+      if (timer.update(ms)) {
 
         // read all
         dallas.requestTemperatures();
         
-        for (auto& sensor : sensors)
+        for (auto& sensor : sensors) {
           if (sensor) {
             const float temp = dallas.getTempC(sensor.value().addr);
             const char* name = sensor.value().sensorName();
@@ -106,14 +106,14 @@ class DallasSensors
               Serial.printf(PSTR("Temp %s %.01f°C\n"), name, temp);
             }
           }
+        }
       }
     }
 
   private:
 
     const char* name;
-    const uint32_t sample_ms;
-    const uint32_t sample_offset_ms;
+    Timer timer;
 
     OneWire wire;
     DallasTemperature dallas;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "sensor.h"
+#include "timer.h"
+
 
 enum WaterLevelID
 {
@@ -37,8 +39,7 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
       uint32_t    offset_ms = 0
     ) : 
       Sensor(name),
-      sample_ms(3600000 / samples_per_hour),
-      sample_offset_ms(offset_ms),
+      timer(3600000 / samples_per_hour, true, offset_ms),
       levels {{ WATER_TOO_LOW, "too_low",    0,  25 },
               { WATER_MINIMUM, "minimum",  350,  50 },
               { WATER_NORMAL,  "normal",   600,  75 },
@@ -58,14 +59,11 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
 
     void init() {
       pinMode(APIN, INPUT);
+      timer.start();
     }
 
     void update(uint32_t ms) {
-      static uint32_t last = sample_offset_ms;
-      last += ms;
-
-      if (last >= sample_ms) {
-        last -= sample_ms * (last / sample_ms);
+      if (timer.update(ms)) {
 
         WaterLevelSample s;
         
@@ -92,15 +90,12 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
           if (onChange)
             onChange(l);
         }
-
       }
     }
 
-
   private:
 
-    const uint32_t sample_ms;
-    const uint32_t sample_offset_ms;
+    Timer timer;
 
     const WaterLevel levels[4];
     WaterLevelID current_level;

@@ -70,7 +70,7 @@ Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
 Battery battery;
 PowerSensor powerSensor("main_power", 0x41, 360);       // i2c devices on the same wires
 SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
-WaterLevelSensor<PIN_LEVEL> levelSensor("main_tank", 3600, 1000);
+WaterLevelSensor<PIN_LEVEL> waterLevelSensor("main_tank", 3600, 1000);
 DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp", 240, 2000);
 
 bool handleSysinfo() {
@@ -213,7 +213,7 @@ void onBatteryLevelChange(const BatteryLevel& level) {
 void updatePumpLockout() {
   const bool tooHot = caseSensor.temperature() > 60.0f;
   const bool lowPow = battery.level() <= BATT_LOW;
-  const bool lowWater = levelSensor.level() <= WATER_TOO_LOW;
+  const bool lowWater = waterLevelSensor.level() <= WATER_TOO_LOW;
   const bool allow = !tooHot && !lowPow && !lowWater;
 
   if (!allow && !pumps.isLocked()) {
@@ -238,7 +238,7 @@ void updateRightStatusLight() {
   if (pumps.isRunning()) {
     lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Blue);
   } else { 
-    switch (levelSensor.level()) {
+    switch (waterLevelSensor.level()) {
       case WATER_TOO_LOW: lights.set(STATUS_RIGHT, Effects::on,     CRGB::Red);          break;
       case WATER_MINIMUM: lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Yellow);       break;
       case WATER_MAXIMUM: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::LightSkyBlue); break;
@@ -342,8 +342,8 @@ void setup() {
   swtch.setOnChange(onSwitchChange);
   swtch.init();
 
-  levelSensor.setOnChange(onWaterLevelChange);
-  levelSensor.init();
+  waterLevelSensor.setOnChange(onWaterLevelChange);
+  waterLevelSensor.init();
 
   battery.setOnChange(onBatteryLevelChange);
 
@@ -360,9 +360,12 @@ void setup() {
   // i2c
   Wire.begin();
   powerSensor.init();
+  caseSensor.init();
   
   // OneWire
   dallasSensors.init();
+
+  waterLevelSensor.init();
 
   initTimeZone();
   setupServer();
@@ -395,7 +398,7 @@ void loop(void) {
   swtch.update();
   powerSensor.update(dt);
   caseSensor.update(dt);
-  levelSensor.update(dt);
+  waterLevelSensor.update(dt);
   dallasSensors.update(dt);
   pumps.update(dt);
 

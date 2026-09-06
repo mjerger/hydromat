@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <INA219_WE.h>
 #include "sensor.h"
+#include "timer.h"
 #include "utils.h"
 
 
@@ -26,8 +27,7 @@ class PowerSensor : public Sensor<PowerSample>
     ) : 
       Sensor(name),
       i2c_addr(addr),
-      sample_ms(3600000 / samples_per_hour),
-      sample_offset_ms(offset_ms),
+      timer(3600000 / samples_per_hour, offset_ms),
       ina219(INA219_WE(addr))
     {}
 
@@ -42,17 +42,15 @@ class PowerSensor : public Sensor<PowerSample>
       ina219.setMeasureMode(INA219_CONTINUOUS); 
       ina219.setBusRange(INA219_BRNG_32);
 
-      if (!ina219.init()) {
+      if (ina219.init()) {
+        timer.start();
+      } else {
         Serial.printf(PSTR("Failed to init ina219 current sensor on i2c address %s\n"), String(i2c_addr, 16).c_str());
       }
     }
 
     void update(uint32_t ms) {
-      static uint32_t last = sample_offset_ms;
-      last += ms;
-
-      if (last >= sample_ms) {
-        last -= sample_ms * (last / sample_ms);
+      if (timer.update(ms)) {
 
         PowerSample s;
         s.bus_mV  = ina219.getBusVoltage_V() * 1000.0;
@@ -72,8 +70,7 @@ class PowerSensor : public Sensor<PowerSample>
   private:
 
     const uint8_t  i2c_addr;
-    const uint32_t sample_ms;
-    const uint32_t sample_offset_ms;
+    Timer timer;
 
     INA219_WE ina219;
 
