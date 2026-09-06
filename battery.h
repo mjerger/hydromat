@@ -1,22 +1,24 @@
 #pragma once
 
-enum BatteryStatus 
+enum BatteryLevelID
 {
   BATT_CRITICAL,
   BATT_LOW,
-  BATT_OK,
+  BATT_NORMAL,
+  BATT_FULL,
   BATT_CHARGING,
-  BATT_OVERCHARGE
+  BATT_OVERCHARGE,
+  NUM_BATT_LEVELS
 };
 
 class BatteryLevel 
 {
   public:
-    BatteryStatus status;
+    BatteryLevelID level;
     const char* name;
     const uint16_t mV;
+    CRGB color;
 };
-
 
 class Battery
 {
@@ -25,12 +27,13 @@ class Battery
     Battery() : 
       voltage_mV(0),
       hysteresis_mV(50),
-      levels{{ BATT_CRITICAL,   "critical"  , 11000 },
-             { BATT_LOW,        "low"       , 11800 },
-             { BATT_OK,         "ok"        , 13700 },
-             { BATT_CHARGING,   "charging"  , 14200 },
-             { BATT_OVERCHARGE, "overcharge", 14500 }},
-      status(BATT_OK)
+      levels{{ BATT_CRITICAL,   "critical"  , 11800, CRGB::Red    },
+             { BATT_LOW,        "low"       , 12000, CRGB::Orange },
+             { BATT_NORMAL,     "normal"    , 12600, CRGB::Yellow },
+             { BATT_FULL,       "full"      , 12800, CRGB::Green  },
+             { BATT_CHARGING,   "charging"  , 14400, CRGB::Blue   },
+             { BATT_OVERCHARGE, "overcharge", 14500, CRGB::Red    }},
+      current_level(BATT_NORMAL)
     {}
 
     typedef void (*OnChange)(const BatteryLevel& level);
@@ -39,19 +42,19 @@ class Battery
       onChange = cb;
     }
 
-    const BatteryLevel& getLevel() const {
-      return levels[status];
+    BatteryLevelID level() const {
+      return current_level;
     }
 
-    float getVoltage() const {
+    float voltage() const {
       return (float)voltage_mV / 1000.0f;
     }
 
-    uint16_t getMillivolts() const {
+    uint16_t millivolts() const {
       return voltage_mV;
     }
 
-    uint8_t getCharge() const {
+    uint8_t charge() const {
       uint16_t v = voltage_mV;
       if (v <= 11600)       // < 11.6V
         return 0;
@@ -63,16 +66,20 @@ class Battery
         return 100;
     }
 
+    const CRGB& color() const {
+      return levels[current_level].color;
+    }
+
     void updateVoltage(uint16_t mV) {
       voltage_mV = mV;
 
       // current level
-      const BatteryLevel& level = levels[status];
-      uint8_t s = (uint8_t)status;
+      const BatteryLevel& level = levels[current_level];
+      uint8_t s = (uint8_t)current_level;
 
       // find new level upwards with hysteresis
       bool changed = false;
-      if (s < 4 && mV > levels[s].mV + hysteresis_mV) {
+      if (s < NUM_BATT_LEVELS-1 && mV > levels[s].mV + hysteresis_mV) {
         s++;
         changed = true;
       }
@@ -84,9 +91,9 @@ class Battery
       }
 
       if (changed) {
-        status = (BatteryStatus)s;
+        current_level = (BatteryLevelID)s;
         if (onChange)
-          onChange(levels[status]);
+          onChange(levels[current_level]);
       }
     }
 
@@ -95,9 +102,9 @@ class Battery
     uint16_t voltage_mV;
     const uint16_t hysteresis_mV;
 
-    const BatteryLevel levels[5];
+    const BatteryLevel levels[NUM_BATT_LEVELS];
 
-    BatteryStatus status;
+    BatteryLevelID current_level;
 
     OnChange onChange = nullptr;
 };

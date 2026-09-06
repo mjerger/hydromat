@@ -2,7 +2,7 @@
 
 #include "sensor.h"
 
-enum WaterStatus
+enum WaterLevelID
 {
   WATER_TOO_LOW,
   WATER_MINIMUM,
@@ -10,16 +10,16 @@ enum WaterStatus
   WATER_MAXIMUM
 };
 
-class WaterLevel 
+class WaterLevel
 {
   public:
-    WaterStatus    status;
+    WaterLevelID   level;
     const char*    name;
     const uint16_t raw;
     const uint8_t  percent;
 };
 
-struct WaterLevelSample 
+struct WaterLevelSample
 {
   uint16_t raw;
   uint8_t level;
@@ -43,7 +43,7 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
               { WATER_MINIMUM, "minimum",  350,  50 },
               { WATER_NORMAL,  "normal",   600,  75 },
               { WATER_MAXIMUM, "maximum", 1000, 100 }},
-      level(WATER_NORMAL)
+      current_level(WATER_NORMAL)
     {}
 
     typedef void (*OnChange)(const WaterLevel& level);
@@ -52,8 +52,8 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
       onChange = cb;
     }
 
-    const WaterLevel& getLevel() const {
-      return levels[level];
+    WaterLevelID level() const {
+      return current_level;
     }
 
     void init() {
@@ -83,11 +83,11 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
 
         Sensor::push(s);
 
-        if (level != (WaterStatus)s.level) {
-          level = (WaterStatus)s.level;
+        if (current_level != (WaterLevelID)s.level) {
+          current_level = (WaterLevelID)s.level;
         
           auto& l = levels[s.level];
-          Serial.printf(PSTR("Level %s %d %s %d%% (%d raw)\n"), name, s.level, l.name, l.percent, s.raw);
+          Serial.printf(PSTR("Level %s %d %s %d%% (%d raw)\n"), sensorName(), s.level, l.name, l.percent, s.raw);
           
           if (onChange)
             onChange(l);
@@ -103,7 +103,7 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
     const uint32_t sample_offset_ms;
 
     const WaterLevel levels[4];
-    WaterStatus level;
+    WaterLevelID current_level;
 
     OnChange onChange = nullptr;
 };

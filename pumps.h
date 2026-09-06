@@ -28,20 +28,19 @@ class Pump
       uint8_t pin,
       OnChange cb
     ) :
-      name(name), 
       pin(pin), 
       max_power(200),
       onChange(cb),
       enabled(true),
-      power(0),
+      current_power(0),
       remaining_ms(0),
       duration_ms(0),
-      sensor(name)
+      sensor_(name)
     {}
     
-    const char* getName()   const { return name; }
-    uint8_t     getPower()  const { return power; }
-    const auto& getSensor() const { return sensor; }
+    const char* name() const   { return sensor_.sensorName();}
+    uint8_t     power()  const { return current_power; }
+    const auto& sensor() const { return sensor_; }
 
     void enable()  { enabled = true; }
     void disable() { turnOff(); enabled = false; }
@@ -60,7 +59,7 @@ class Pump
         const uint32_t runtime_ms = duration_ms-remaining_ms;
         remaining_ms = 0;
 
-        Serial.printf(PSTR("Turn off %s after %dms\n"), name, runtime_ms);
+        Serial.printf(PSTR("Turn off %s after %dms\n"), name(), runtime_ms);
       }
     }
     
@@ -74,7 +73,7 @@ class Pump
       duration_ms = seconds * 1000;
       remaining_ms = duration_ms;
 
-      Serial.printf(PSTR("Turn on %s for %ds at %d power\n"), name, seconds, p);
+      Serial.printf(PSTR("Turn on %s for %ds at %d power\n"), name(), seconds, p);
     }
 
     void turnOff() {
@@ -82,16 +81,16 @@ class Pump
       setPower(0);
     }
 
-    void setPower(uint8_t pwr) {
-      if (!enabled && pwr)
+    void setPower(uint8_t power) {
+      if (!enabled && power)
         return;
       
-      power = pwr > max_power ? max_power : pwr;
-      output(power);
-      sensor.push(pwr);
+      current_power = power > max_power ? max_power : power;
+      output(current_power);
+      sensor_.push(current_power);
       
       if (onChange)
-        onChange(*this, power);
+        onChange(*this, current_power);
     }
 
   private:
@@ -99,18 +98,17 @@ class Pump
       analogWrite(pin, value);
     }
 
-    const char* name;
     const uint8_t pin;
     const uint8_t max_power;
 
     const OnChange onChange;
     
     bool enabled;
-    uint8_t power;
+    uint8_t current_power;
     uint32_t remaining_ms;
     uint32_t duration_ms;
 
-    Sensor<uint8_t> sensor;
+    Sensor<uint8_t> sensor_;
 };
 
 #define for_each(dev) \
@@ -177,7 +175,7 @@ class Pumps
             prog.duration = seconds;
             prog.power = (255*(uint32_t)power)/100;
 
-            Serial.printf(PSTR("Add cron #%d for %s program %d: '%s' %ds %d%%\n"), prog.id, pump.getName(), p+1, cstr.c_str(), seconds, power);
+            Serial.printf(PSTR("Add cron #%d for %s program %d: '%s' %ds %d%%\n"), prog.id, pump.name(), p+1, cstr.c_str(), seconds, power);
           }
         }
       }
@@ -201,7 +199,7 @@ class Pumps
     // is any pump running?
     bool isRunning() const {
       for_each(pump)
-        if (pump.getPower())
+        if (pump.power())
           return true;
       return false;
     }

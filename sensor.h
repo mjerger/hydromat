@@ -23,15 +23,15 @@ class Sensor
       onSample = cb;
     }
 
-    const char* getName() const { 
+    const char* sensorName() const { 
       return name; 
     }
 
-    const sample_type& getLastSample() const {
+    const sample_type& lastSample() const {
       return buffer.last().val;
     }
 
-    uint16_t getSampleCount() const {
+    uint16_t sampleCount() const {
       return buffer.size();
     }
 
@@ -47,9 +47,9 @@ class Sensor
     }
     
   protected:
-  
-    const char* name;
     CircularBuffer<Sample<sample_type>, size> buffer;
 
+  private:
+    const char* name;
     OnSample onSample = nullptr;
 };

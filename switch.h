@@ -9,7 +9,7 @@ class Switch
 
     Switch() : pos(1) {}
 
-    const int getPos() { return pos; }
+    const int position() { return pos; }
 
     typedef void (*OnChange)(int current, int last);
 

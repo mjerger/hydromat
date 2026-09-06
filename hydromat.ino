@@ -187,7 +187,7 @@ void onSwitchChange(int cur, int last) {
 
 // turn light on with the pump
 void onPumpChange(Pump& pump, uint8_t power) {
-  Serial.printf(PSTR("%s set power to %d\n"), pump.getName(), power);
+  Serial.printf(PSTR("%s set power to %d\n"), pump.sensor().sensorName(), power);
   updateRightStatusLight();
   
   // wake up backlight when a pump is turned on
@@ -211,16 +211,16 @@ void onBatteryLevelChange(const BatteryLevel& level) {
 
 // lock / unlock pumps
 void updatePumpLockout() {
-  const bool tooHot = caseSensor.getTemperature() > 60.0f;
-  const bool lowPow = battery.getLevel().status <= BATT_LOW;
-  const bool lowWater = levelSensor.getLevel().percent <= 25;
+  const bool tooHot = caseSensor.temperature() > 60.0f;
+  const bool lowPow = battery.level() <= BATT_LOW;
+  const bool lowWater = levelSensor.level() <= WATER_TOO_LOW;
   const bool allow = !tooHot && !lowPow && !lowWater;
 
   if (!allow && !pumps.isLocked()) {
     pumps.lock();
     Serial.print(PSTR("Pumps locked due to"));
-    if (tooHot)   Serial.printf(PSTR(" high internal case temperature (%.1f°C)"), caseSensor.getTemperature());
-    if (lowPow)   Serial.printf(PSTR(" low battery (%.2fV)"), battery.getVoltage());
+    if (tooHot)   Serial.printf(PSTR(" high internal case temperature (%.1f°C)"), caseSensor.temperature());
+    if (lowPow)   Serial.printf(PSTR(" low battery (%.2fV)"), battery.voltage());
     if (lowWater) Serial.printf(PSTR(" low water"));
     Serial.println();
 
@@ -238,11 +238,11 @@ void updateRightStatusLight() {
   if (pumps.isRunning()) {
     lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Blue);
   } else { 
-    switch (levelSensor.getLevel().percent) {
-      case  25: lights.set(STATUS_RIGHT, Effects::on,     CRGB::Red);          break; // too low
-      case  50: lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Yellow);       break; // minimum
-      case 100: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::LightSkyBlue); break; // maximum
-      default:  lights.set(STATUS_RIGHT, Effects::off);
+    switch (levelSensor.level()) {
+      case WATER_TOO_LOW: lights.set(STATUS_RIGHT, Effects::on,     CRGB::Red);          break;
+      case WATER_MINIMUM: lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Yellow);       break;
+      case WATER_MAXIMUM: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::LightSkyBlue); break;
+      default:            lights.set(STATUS_RIGHT, Effects::off);
     }
   }
 }
@@ -257,13 +257,14 @@ void updateLeftStatusLight() {
   if (WiFi.status() != WL_CONNECTED) {
     lights.set(STATUS_LEFT, connectEffect, CRGB::Orange);
   } else {
-    switch(battery.getLevel().status) {
-      case BATT_CRITICAL:   lights.set(STATUS_LEFT, flashEffect, CRGB::Red);   break;
-      case BATT_LOW:        lights.set(STATUS_LEFT, pulseEffect, CRGB::Red);   break;
-      case BATT_CHARGING:   lights.set(STATUS_LEFT, pulseEffect, CRGB::Green); break;
-      case BATT_OVERCHARGE: lights.set(STATUS_LEFT, blinkEffect, CRGB::Red);   break;
-      default:              lights.set(STATUS_LEFT, Effects::off);             break;
+    EFunc effect = Effects::off;
+    switch(battery.level()) {
+      case BATT_CRITICAL:   effect = flashEffect; break;
+      case BATT_LOW:
+      case BATT_CHARGING:   effect = pulseEffect; break;
+      case BATT_OVERCHARGE: effect = blinkEffect; break;
     }
+    lights.set(STATUS_LEFT, effect, battery.color());
   }
 }
 
@@ -278,18 +279,12 @@ EFunc backlightEffect(uint32_t seed) {
     uint32_t led_15V = 4;
     uint32_t led_0V  = 18;
     if (i >= led_15V && i <= led_0V) {
-      uint16_t v = battery.getMillivolts();
+      uint16_t v = battery.millivolts();
       if (v) {
         // map voltage to LED index
         uint8_t vi = map(v, 0, 15000, led_0V, led_15V);
-        if (i >= vi-1 && i <= vi+1) {
-               if (v < 12000 ) color = CRGB::Red;     // < 25%
-          else if (v < 12200 ) color = CRGB::Orange;  // < 50%
-          else if (v < 12500 ) color = CRGB::Yellow;  // < 75%
-          else if (v > 14400 ) color = CRGB::Red;     // overvoltage
-          else if (v > 13000 ) color = CRGB::Blue;    // charging
-          else                 color = CRGB::Green;   // 100%
-        }
+        if (i >= vi-1 && i <= vi+1)
+          color = battery.color();
       }
     }
 
@@ -317,7 +312,7 @@ void setup() {
 
   // switch position sets the switch light
   lights.set(SWITCH, [](int i, uint32_t t) -> CRGB { 
-    if (i == 4-swtch.getPos()) 
+    if (i == 4 - swtch.position()) 
       return Effects::ON; 
     return Effects::ON % 4;
   }, Effects::PlasmaPurple);

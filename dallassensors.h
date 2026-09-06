@@ -87,7 +87,7 @@ class DallasSensors
         for (auto& sensor : sensors)
           if (sensor) {
             const float temp = dallas.getTempC(sensor.value().addr);
-            const char* name = sensor.value().getName();
+            const char* name = sensor.value().sensorName();
 
             if (temp == DEVICE_DISCONNECTED_C)
               Serial.printf(PSTR("Dallas sensor %s did not respond\n"), name);

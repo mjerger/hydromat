@@ -26,8 +26,8 @@ class SHT21Sensor : public Sensor<THSample>
       sample_offset_ms(offset_ms)
     {}
 
-    float getTemperature() { return temp_c;    }
-    float getHumidity()    { return humid_rel; }
+    float temperature() { return temp_c;    }
+    float humidity()    { return humid_rel; }
 
     void update(uint32_t ms) {
       static uint32_t last = sample_offset_ms;
@@ -42,7 +42,7 @@ class SHT21Sensor : public Sensor<THSample>
 
         Sensor::push({ temp_c, humid_rel });
 
-        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), name, temp_c, humid_rel);
+        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), sensorName(), temp_c, humid_rel);
       }
     }
 
