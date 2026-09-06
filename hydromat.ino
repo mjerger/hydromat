@@ -272,26 +272,29 @@ EFunc backlightEffect(uint32_t seed) {
   return [seed] (int i, uint32_t t) -> CRGB {
     static const EFunc glitch = Effects::glitch(seed);
 
+    CRGB color = Effects::PlasmaPurple;
+
+    // battery indicator
     uint32_t led_15V = 4;
     uint32_t led_0V  = 18;
     if (i >= led_15V && i <= led_0V) {
       uint16_t v = battery.getMillivolts();
       if (v) {
+        // map voltage to LED index
         uint8_t vi = map(v, 0, 15000, led_0V, led_15V);
         if (i >= vi-1 && i <= vi+1) {
-          if (v < 12000 ) return CRGB::Red;     // < 25%
-          if (v < 12200 ) return CRGB::Orange;  // < 50%
-          if (v < 12500 ) return CRGB::Yellow;  // < 75%
-          if (v > 14400 ) return CRGB::Red;     // overvoltage
-          if (v > 13000 ) return CRGB::Blue;    // charging
-          
-          return CRGB::Green;                   // 100%
+               if (v < 12000 ) color = CRGB::Red;     // < 25%
+          else if (v < 12200 ) color = CRGB::Orange;  // < 50%
+          else if (v < 12500 ) color = CRGB::Yellow;  // < 75%
+          else if (v > 14400 ) color = CRGB::Red;     // overvoltage
+          else if (v > 13000 ) color = CRGB::Blue;    // charging
+          else                 color = CRGB::Green;   // 100%
         }
       }
     }
 
     CRGB bg = glitch(i,t);
-    return mult(bg, Effects::PlasmaPurple);
+    return mult(bg, color);
   };
 };
 
