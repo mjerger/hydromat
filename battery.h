@@ -28,7 +28,7 @@ class Battery
       levels{{ BATT_CRITICAL,   "critical"  , 11000 },
              { BATT_LOW,        "low"       , 11800 },
              { BATT_OK,         "ok"        , 13700 },
-             { BATT_CHARGING,   "charging"  , 14400 },
+             { BATT_CHARGING,   "charging"  , 14200 },
              { BATT_OVERCHARGE, "overcharge", 14500 }},
       status(BATT_OK)
     {}
@@ -39,16 +39,20 @@ class Battery
       onChange = cb;
     }
 
-    const BatteryLevel& getLevel() {
+    const BatteryLevel& getLevel() const {
       return levels[status];
     }
 
-    const float getVoltage() {
+    float getVoltage() const {
       return (float)voltage_mV / 1000.0f;
     }
 
-    const uint8_t getCharge() {
-      uint32_t v = voltage_mV;
+    uint16_t getMillivolts() const {
+      return voltage_mV;
+    }
+
+    uint8_t getCharge() const {
+      uint16_t v = voltage_mV;
       if (v <= 11600)       // < 11.6V
         return 0;
       else if (v <= 12200)  // 11.6V to 12.2V
@@ -66,7 +70,7 @@ class Battery
       const BatteryLevel& level = levels[status];
       uint8_t s = (uint8_t)status;
 
-      // find new level upwards
+      // find new level upwards with hysteresis
       bool changed = false;
       if (s < 4 && mV > levels[s].mV + hysteresis_mV) {
         s++;
@@ -74,7 +78,7 @@ class Battery
       }
 
       // find new level downwards
-      if (!changed && s > 0 && mV < levels[s-1].mV - hysteresis_mV) {
+      if (!changed && s > 0 && mV < levels[s-1].mV) {
         s--;
         changed = true;
       }

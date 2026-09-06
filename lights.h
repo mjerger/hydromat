@@ -38,7 +38,6 @@ class Lights
     }
 
     void update(uint32_t ms) {
-
       sleep_timer.update(ms);
       fadeout_timer.update(ms);
 

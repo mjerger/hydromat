@@ -16,6 +16,14 @@ clamp(T value, T min, T max) {
   return value;
 }
 
+int32_t map(int32_t x, int32_t a1, int32_t a2, int32_t b1, int32_t b2) {
+  return (x - a1) * (b2 - b1 + 1) / (a2 - a1 + 1) + b1;
+}
+
+float mapf(float x, float a1, float a2, float b1, float b2) {
+  return (x - a1) * (b2 - b1 + 1) / (a2 - a1 + 1) + b1;
+}
+
 const CRGB& mult(CRGB& a, const CRGB& b) {
   a.r = ((int)a.r * (int)b.r) / 0xff;
   a.g = ((int)a.g * (int)b.g) / 0xff;

@@ -68,7 +68,7 @@ const char *version = "0.3";
 Lights<PIN_LEDS> lights;
 Switch<PIN_SWITCH_0, PIN_SWITCH_1> swtch;
 Battery battery;
-PowerSensor powerSensor("main_power", 0x41, 240);       // i2c devices on the same wires
+PowerSensor powerSensor("main_power", 0x41, 360);       // i2c devices on the same wires
 SHT21Sensor caseSensor ("case_temp",  0x40,  60, 5000); // samples 5 sec before power sensor
 WaterLevelSensor<PIN_LEVEL> levelSensor("main_tank", 3600, 1000);
 DallasSensors<PIN_DS_ONEWIRE, 2> dallasSensors("ext_temp", 240, 2000);
@@ -267,6 +267,35 @@ void updateLeftStatusLight() {
   }
 }
 
+
+EFunc backlightEffect(uint32_t seed) {
+  return [seed] (int i, uint32_t t) -> CRGB {
+    static const EFunc glitch = Effects::glitch(seed);
+
+    uint32_t led_15V = 4;
+    uint32_t led_0V  = 18;
+    if (i >= led_15V && i <= led_0V) {
+      uint16_t v = battery.getMillivolts();
+      if (v) {
+        uint8_t vi = map(v, 0, 15000, led_0V, led_15V);
+        if (i >= vi-1 && i <= vi+1) {
+          if (v < 12000 ) return CRGB::Red;     // < 25%
+          if (v < 12200 ) return CRGB::Orange;  // < 50%
+          if (v < 12500 ) return CRGB::Yellow;  // < 75%
+          if (v > 14400 ) return CRGB::Red;     // overvoltage
+          if (v > 13000 ) return CRGB::Blue;    // charging
+          
+          return CRGB::Green;                   // 100%
+        }
+      }
+    }
+
+    CRGB bg = glitch(i,t);
+    return mult(bg, Effects::PlasmaPurple);
+  };
+};
+
+
 void setup() {
   // try to get a random seed
   pinMode(A0, INPUT);
@@ -291,7 +320,7 @@ void setup() {
   }, Effects::PlasmaPurple);
 
   // turn on light early
-  lights.set(BACKLIGHT, Effects::glitch(seed), Effects::PlasmaPurple);
+  lights.set(BACKLIGHT, backlightEffect(seed));
   lights.init();
   lights.update(0);
 
