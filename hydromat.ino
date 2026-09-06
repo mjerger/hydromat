@@ -367,7 +367,8 @@ void setup() {
       return;
 
     // simple running average
-    static uint32_t last[4] = {0, 0, 0, 0};
+    const uint32_t count = 6;
+    static uint32_t last[count];
     static uint8_t cur = 0;
     static uint8_t max = 0;
 
@@ -379,7 +380,7 @@ void setup() {
 
     battery.updateVoltage(avg / (max+1));
 
-    cur = (cur + 1) % 4;
+    cur = (cur + 1) % count;
     if (max < cur)
       max = cur;
   });
