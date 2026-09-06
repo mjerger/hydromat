@@ -363,8 +363,25 @@ void setup() {
 
   powerSensor.setOnUpdate([](const PowerSample& sample) {
     // inaccurate when pumps are running
-    if (!pumps.isRunning())
-      battery.updateVoltage(sample.batt_mV); 
+    if (pumps.isRunning())
+      return;
+
+    // simple running average
+    static uint32_t last[4] = {0, 0, 0, 0};
+    static uint8_t cur = 0;
+    static uint8_t max = 0;
+
+    last[cur] = sample.batt_mV;
+
+    uint32_t avg = 0;
+    for (uint8_t i=0; i<max+1; i++)
+      avg += last[i];
+
+    battery.updateVoltage(avg / (max+1));
+
+    cur = (cur + 1) % 4;
+    if (max < cur)
+      max = cur;
   });
 
   caseSensor.setOnSample([](const THSample& _) { 
