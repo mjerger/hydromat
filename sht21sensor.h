@@ -26,27 +26,31 @@ class SHT21Sensor : public Sensor<THSample>
       timer(3600000 / samples_per_hour, true, offset_ms)
     {}
 
-    float temperature() { return temp_c;    }
-    float humidity()    { return humid_rel; }
+    float temperature() { return reading.temp_c;    }
+    float humidity()    { return reading.humid_rel; }
 
     void init() {
-      timer.start();
+      reading = read();
     }
 
     void update(uint32_t ms) {
       if (timer.update(ms)) {
+        reading = read();
+        Sensor::push(reading);
 
-        // TODO? handle errors?
-        temp_c = readT();
-        humid_rel = readH();
-
-        Sensor::push({ temp_c, humid_rel });
-
-        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), sensorName(), temp_c, humid_rel);
+        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), sensorName(), reading.temp_c, reading.humid_rel);
       }
     }
 
+    THSample read() {
+      THSample s;
+      s.temp_c = readT();
+      s.humid_rel = readH();
+      return s;
+    }
+
   private:
+
 
     float readT() {
       // this can prbly be found in the datasheet, but i got it from here https://github.com/elechouse/SHT21_Arduino
@@ -84,6 +88,5 @@ class SHT21Sensor : public Sensor<THSample>
     
     const bool hold_master = true; // block i2c while taking reading (?)
 
-    float temp_c;
-    float humid_rel;
+    THSample reading;
 };

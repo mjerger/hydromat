@@ -43,13 +43,12 @@ class Lights
 
       // start dimming?
       if (sleep_timer.ticked()) {
-        sleep_timer.reset();
+        sleep_timer.stop();
         fadeout_timer.restart();
       }
       // dim backlight
       if (fadeout_timer.ticked()) {
         brightness = min_brightness;
-        fadeout_timer.reset();
       } else if (fadeout_timer.active()) {
         float progress = min(1.0, 1.0 - fadeout_timer.progress());
         float b = min_brightness * pow((float)max_brightness / (float)min_brightness, progress);

@@ -39,11 +39,11 @@ class PowerSensor : public Sensor<PowerSample>
       onUpdate = cb;
     }
 
-    float busVoltage()     { return (float)power.bus_mV  / 1000.0f; }
-    float busCurrent()     { return (float)power.bus_mA  / 1000.0f; }
-    float busPower()       { return (float)power.bus_mW  / 1000.0f; }
-    float loadVoltage()    { return (float)power.load_mV / 1000.0f; }
-    float batteryVoltage() { return (float)power.batt_mV / 1000.0f; }
+    float busVoltage()     { return (float)reading.bus_mV  / 1000.0f; }
+    float busCurrent()     { return (float)reading.bus_mA  / 1000.0f; }
+    float busPower()       { return (float)reading.bus_mW  / 1000.0f; }
+    float loadVoltage()    { return (float)reading.load_mV / 1000.0f; }
+    float batteryVoltage() { return (float)reading.batt_mV / 1000.0f; }
 
     void init() {
       ina219.setADCMode(INA219_SAMPLE_MODE_16);  // 16 sample average
@@ -56,6 +56,8 @@ class PowerSensor : public Sensor<PowerSample>
       } else {
         Serial.printf(PSTR("Failed to init ina219 current sensor on i2c address %s\n"), String(i2c_addr, 16).c_str());
       }
+
+      reading = read();
     }
 
     void update(uint32_t ms) {
@@ -64,22 +66,27 @@ class PowerSensor : public Sensor<PowerSample>
 
       if (updateTimer.ticked() || sampleTimer.ticked()) {
 
-        PowerSample s;
-        s.bus_mV  = ina219.getBusVoltage_V() * 1000.0;
-        s.bus_mA  = ina219.getCurrent_mA();
-        s.bus_mW  = ina219.getBusPower();
-        s.load_mV = ina219.getBusVoltage_V() * 1000.0 + ina219.getShuntVoltage_mV();
-        s.batt_mV = s.bus_mV + calc1N5822ForwardVoltage(s.bus_mA);
-        power = s;
+        reading = read();
 
         if (onUpdate)
-          onUpdate(power);
+          onUpdate(reading);
 
         if (sampleTimer.ticked()) {
-          Sensor::push(s);
-          Serial.printf(PSTR("Power %s bus %dmV, %dmA, %dmW load %dmV batt %dmV\n"), sensorName(), s.bus_mV, s.bus_mA, s.bus_mW, s.load_mV, s.batt_mV);
+          Sensor::push(reading);
+          Serial.printf(PSTR("Power %s bus %dmV, %dmA, %dmW load %dmV batt %dmV\n"), 
+            sensorName(), reading.bus_mV, reading.bus_mA, reading.bus_mW, reading.load_mV, reading.batt_mV);
         }
       }
+    }
+
+    PowerSample read() {
+      PowerSample s;
+      s.bus_mV  = ina219.getBusVoltage_V() * 1000.0;
+      s.bus_mA  = ina219.getCurrent_mA();
+      s.bus_mW  = ina219.getBusPower();
+      s.load_mV = ina219.getBusVoltage_V() * 1000.0 + ina219.getShuntVoltage_mV();
+      s.batt_mV = s.bus_mV + calc1N5822ForwardVoltage(s.bus_mA);
+      return s;
     }
 
   private:
@@ -90,7 +97,7 @@ class PowerSensor : public Sensor<PowerSample>
 
     INA219_WE ina219;
 
-    PowerSample power;
+    PowerSample reading;
 
     OnUpdate onUpdate = nullptr;
 };

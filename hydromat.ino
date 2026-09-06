@@ -272,8 +272,22 @@ void updateLeftStatusLight() {
 EFunc backlightEffect(uint32_t seed) {
   return [seed] (int i, uint32_t t) -> CRGB {
     static const EFunc glitch = Effects::glitch(seed);
+    static const EFunc flash  = Effects::blink(200, 900);
+    static const EFunc pulse  = Effects::pulse(4000, 0.1);
 
     CRGB color = Effects::PlasmaPurple;
+
+    // flash warnings
+    if (caseSensor.temperature() > 70.0f) {
+      color = CRGB::Red;
+      color = mult(color, flash(i,t));
+    } else if (caseSensor.humidity() > 80.0f) {
+      color = CRGB::Blue;
+      color = mult(color, flash(i,t));
+    } else if (waterLevelSensor.level() == WATER_TOO_LOW) {
+        color = CRGB::Blue;
+        color = mult(color, pulse(i,t));
+    }
 
     // battery indicator
     uint32_t led_15V = 4;

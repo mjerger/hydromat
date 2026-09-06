@@ -74,8 +74,8 @@ class DallasSensors
         }
       }
 
-      if (numFound > 0)
-        timer.start();
+      if (!numFound)
+        timer.stop();
     }
 
     void update(uint32_t ms) {

@@ -59,7 +59,6 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
 
     void init() {
       pinMode(APIN, INPUT);
-      timer.start();
     }
 
     void update(uint32_t ms) {
