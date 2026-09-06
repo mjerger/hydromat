@@ -27,7 +27,7 @@ class PowerSensor : public Sensor<PowerSample>
     ) : 
       Sensor(name),
       i2c_addr(addr),
-      timer(3600000 / samples_per_hour, offset_ms),
+      timer(3600000 / samples_per_hour, true, offset_ms),
       ina219(INA219_WE(addr))
     {}
 
