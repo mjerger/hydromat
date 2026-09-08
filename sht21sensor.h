@@ -8,6 +8,10 @@
 struct THSample {
   float temp_c;
   float humid_rel;
+
+  String toString() const {
+    return String(temp_c, 2)  + ' ' + String(humid_rel, 2);
+  }
 };
 
 
@@ -38,7 +42,7 @@ class SHT21Sensor : public Sensor<THSample>
         reading = read();
         Sensor::push(reading);
 
-        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), sensorName(), reading.temp_c, reading.humid_rel);
+        Serial.printf(PSTR("Temp %s %.1f°C %.1f%%rH\n"), name(), reading.temp_c, reading.humid_rel);
       }
     }
 

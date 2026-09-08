@@ -84,6 +84,39 @@ namespace Effects
     };
   };
 
+
+  EFunc perlin(uint32_t a, uint32_t b) {
+    return [a, b] (int i, uint32_t t) -> CRGB {
+        return ON % inoise8(t / a + (i * b), t/10);
+    };
+  };
+
+
+  EFunc perlin_rainbow(uint32_t a, uint32_t b) {
+    return [a, b] (int i, uint32_t t) -> CRGB {
+        return CHSV(inoise8(t / a + (i * b), t/10), 255, 255);
+    };
+  };
+
+
+  EFunc sine(uint32_t a = 8, uint32_t b = 12) {
+    return [a, b] (int i, uint32_t t) -> CRGB {
+      return ON % sin8(t / a + i * b);
+    };
+  };
+
+
+  EFunc waves3(uint32_t a = 8, uint32_t b = 12, uint32_t c = 16) {
+    return [a, b, c] (int i, uint32_t t) -> CRGB {
+      uint8_t wave1 = sin8(t / 10 + i * a);
+      uint8_t wave2 = sin8(t / 20 + i * b);
+      uint8_t wave3 = sin8(t / 30 + i * c);
+
+      return ON % (wave1 + wave2 + wave3) / 3;
+    };
+  };
+
+
   // deterministic fast hash — same input always gives same output
   static inline uint32_t hash(uint32_t x) {
     x ^= x >> 16;

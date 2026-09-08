@@ -35,6 +35,9 @@ class Lights
       FastLED.addLeds<WS2812, PIN, GRB>(leds, num_leds);
       FastLED.setBrightness(255);
       FastLED.clear();
+
+      sleep_timer.start();
+      fadeout_timer.stop();
     }
 
     void update(uint32_t ms) {
@@ -43,12 +46,15 @@ class Lights
 
       // start dimming?
       if (sleep_timer.ticked()) {
+        sleep_timer.stop();
         sleep_timer.reset();
-        fadeout_timer.restart();
+        fadeout_timer.start();
       }
       
       // dim backlight
       if (fadeout_timer.ticked()) {
+        fadeout_timer.stop();
+        fadeout_timer.reset();
         brightness = min_brightness;
       } else if (fadeout_timer.active()) {
         float progress = min(1.0, 1.0 - fadeout_timer.progress());
@@ -89,6 +95,7 @@ class Lights
 
     void wakeUp() {
       fadeout_timer.stop();
+      fadeout_timer.reset();
       sleep_timer.restart();
       brightness = max_brightness;
     }

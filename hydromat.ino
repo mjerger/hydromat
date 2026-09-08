@@ -98,23 +98,46 @@ bool handleSysinfo() {
   return http::sendJson(json);
 }
 
+// Response with sensor data
+bool handleSensor(String path) {
+  String name = name.substring(1);
+  if (!sensors.has(name))
+    return false;
+
+  return true;
+
+  http::server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  http::server.send(200, "text/plain", "");
+
+  sensors.get(name)->emit([](const String& line) {
+    http::server.sendContent(line + "\n");
+  });
+
+  http::server.sendContent("");
+
+  return true;
+}
+
 void setupServer() {
   // routes
-  http::server.on("/",                      HTTP_GET,   []() { http::handleFile("/home.html");      });
-  http::server.on("/settings",              HTTP_GET,   []() { http::handleFile("/settings.html");  });
-  //server.on("/config",                HTTP_ANY,   []() { handleConfig(server);  });
-  http::server.on("/sysinfo",               HTTP_GET,   []() { handleSysinfo();  });
-  //server.on(UriRegex("/tds/(.*)"),    HTTP_GET,   []() { handleTDS(server.pathArg(0));  });
-
-  // we use our own routing hacky hack
+  http::server.on("/sysinfo", HTTP_GET, []() { handleSysinfo(); });
+  
+  // all others
   http::server.onNotFound([]() {
     Serial.print(http::methods[http::server.method()] + " -> " + http::server.uri());
+
+    if (handleSensor(http::server.uri())) {
+      Serial.println(" ok");
+      return;  
+    }
+
     if (http::handleFile(http::server.uri())) {
       Serial.println(" ok");
-    } else {
-      Serial.println(" not found");
-      http::server.send(404, "text/plain", "404: Not Found");
+      return;
     }
+
+    Serial.println(" not found");
+    http::server.send(404, "text/plain", "404: Not Found");
   });
 
   // Start Server
@@ -187,7 +210,7 @@ void onSwitchChange(int cur, int last) {
 
 // turn light on with the pump
 void onPumpChange(Pump& pump, uint8_t power) {
-  Serial.printf(PSTR("%s set power to %d\n"), pump.sensor().sensorName(), power);
+  Serial.printf(PSTR("%s set power to %d\n"), pump.sensor().name(), power);
   updateRightStatusLight();
   
   // wake up backlight when a pump is turned on
@@ -232,16 +255,17 @@ void updatePumpLockout() {
 
 // right status: pump activity, water level
 void updateRightStatusLight() {
-  static const EFunc slowPulseEffect = Effects::pulse(3000, 0.05);
-  static const EFunc fastPulseEffect = Effects::pulse(1000, 0.05);
+  static const EFunc slowPulse = Effects::pulse(3000, 0.05);
+  static const EFunc fastPulse = Effects::pulse(1000, 0.05);
 
   if (pumps.isRunning()) {
-    lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Blue);
+    lights.set(STATUS_RIGHT, slowPulse, CRGB::Blue);
+  } else if (pumps.isLocked()) {
+    lights.set(STATUS_RIGHT, fastPulse, CRGB::Red);
   } else { 
     switch (waterLevelSensor.level()) {
-      case WATER_TOO_LOW: lights.set(STATUS_RIGHT, Effects::on,     CRGB::Red);          break;
-      case WATER_MINIMUM: lights.set(STATUS_RIGHT, slowPulseEffect, CRGB::Yellow);       break;
-      case WATER_MAXIMUM: lights.set(STATUS_RIGHT, fastPulseEffect, CRGB::LightSkyBlue); break;
+      case WATER_MINIMUM: lights.set(STATUS_RIGHT, slowPulse,   CRGB::Yellow);       break;
+      case WATER_MAXIMUM: lights.set(STATUS_RIGHT, fastPulse,   CRGB::LightSkyBlue); break;
       default:            lights.set(STATUS_RIGHT, Effects::off);
     }
   }
@@ -249,20 +273,20 @@ void updateRightStatusLight() {
 
 // left status: wifi, battery status
 void updateLeftStatusLight() {
-  static const EFunc connectEffect = Effects::blink(1000, 500);
-  static const EFunc flashEffect   = Effects::blink(100, 900);
-  static const EFunc pulseEffect   = Effects::pulse(4000, 0.1);
-  static const EFunc blinkEffect   = Effects::blink(500, 500);
+  static const EFunc connect = Effects::blink(1000, 500);
+  static const EFunc flash   = Effects::blink(100, 900);
+  static const EFunc pulse   = Effects::pulse(4000, 0.1);
+  static const EFunc blink   = Effects::blink(500, 500);
   
   if (WiFi.status() != WL_CONNECTED) {
-    lights.set(STATUS_LEFT, connectEffect, CRGB::Orange);
+    lights.set(STATUS_LEFT, connect, CRGB::Orange);
   } else {
     EFunc effect = Effects::off;
     switch(battery.level()) {
-      case BATT_CRITICAL:   effect = flashEffect; break;
+      case BATT_CRITICAL:   effect = flash; break;
       case BATT_LOW:
-      case BATT_CHARGING:   effect = pulseEffect; break;
-      case BATT_OVERCHARGE: effect = blinkEffect; break;
+      case BATT_CHARGING:   effect = pulse; break;
+      case BATT_OVERCHARGE: effect = blink; break;
     }
     lights.set(STATUS_LEFT, effect, battery.color());
   }
@@ -273,23 +297,26 @@ EFunc backlightEffect(uint32_t seed) {
   return [seed] (int i, uint32_t t) -> CRGB {
     static const EFunc glitch = Effects::glitch(seed);
     static const EFunc flash  = Effects::blink(200, 900);
-    static const EFunc pulse  = Effects::pulse(4000, 0.1);
+    static const EFunc pulse  = Effects::pulse(4000, 0.05);
+    static const EFunc rotate = Effects::sine(3, 42);
 
     CRGB color = Effects::PlasmaPurple;
 
-    // flash warnings
     if (caseSensor.temperature() > 70.0f) {
       color = CRGB::Red;
-      color = mult(color, flash(i,t));
+      color = mult(color, flash(i, t));
     } else if (caseSensor.humidity() > 80.0f) {
       color = CRGB::Blue;
-      color = mult(color, flash(i,t));
+      color = mult(color, flash(i, t));
     } else if (waterLevelSensor.level() == WATER_TOO_LOW) {
-        color = CRGB::Blue;
-        color = mult(color, pulse(i,t));
+      color = CRGB::Blue;
+      color = mult(color, pulse(i, t));
+    } else if (pumps.isRunning()) {
+      color = CRGB::SkyBlue;
+      color = mult(color, rotate(i, t));
     }
 
-    // battery indicator
+    // overlay battery indicator
     uint32_t led_15V = 4;
     uint32_t led_0V  = 18;
     if (i >= led_15V && i <= led_0V) {

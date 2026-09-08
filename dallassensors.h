@@ -49,7 +49,7 @@ class DallasSensors
       for (int i=0; i < min(MAX_COUNT, numFound); i++) {
         DeviceAddress addr;
         if (dallas.getAddress(addr, i)) {
-          for (auto& sensor : sensors) 
+          for (auto& sensor : registry) 
             if (!sensor) {
 
               // simple id from addr
@@ -84,10 +84,10 @@ class DallasSensors
         // read all
         dallas.requestTemperatures();
         
-        for (auto& sensor : sensors) {
+        for (auto& sensor : registry) {
           if (sensor) {
             const float temp = dallas.getTempC(sensor.value().addr);
-            const char* name = sensor.value().sensorName();
+            const char* name = sensor.value().name();
 
             if (temp == DEVICE_DISCONNECTED_C)
               Serial.printf(PSTR("Dallas sensor %s did not respond\n"), name);
@@ -118,5 +118,5 @@ class DallasSensors
     OneWire wire;
     DallasTemperature dallas;
 
-    std::array<std::optional<DallasSensor>, MAX_COUNT> sensors;
+    std::array<std::optional<DallasSensor>, MAX_COUNT> registry;
 };

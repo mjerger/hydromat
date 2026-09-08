@@ -38,7 +38,7 @@ class Pump
       sensor_(name)
     {}
     
-    const char* name() const   { return sensor_.sensorName();}
+    const char* name() const   { return sensor_.name();}
     uint8_t     power()  const { return current_power; }
     const auto& sensor() const { return sensor_; }
 
@@ -111,10 +111,12 @@ class Pump
     Sensor<uint8_t> sensor_;
 };
 
-#define for_each(dev) \
-  for (auto& device : devices) \
+
+#define for_each_pump(dev) \
+  for (auto& device : registry) \
     if (device) \
       if (auto& dev = device.value(); true)
+
 
 class Pumps;
 extern Pumps pumps;
@@ -154,7 +156,7 @@ class Pumps
     {}
 
     void init() {
-      for_each(pump) {
+      for_each_pump(pump) {
         // load from config and start the crons
         for (int p=0; p<2; p++) {
           String prog = F("prog_") + String(p+1);
@@ -182,13 +184,13 @@ class Pumps
     }
 
     void update(uint32_t ms) {
-      for_each(pump)
+      for_each_pump(pump)
         pump.update(ms);
     }
 
     // add a pump (call before init)
     void add(const char* id, const char* name, uint8_t pin, Pump::OnChange cb) {
-      for (auto& device : devices) {
+      for (auto& device : registry) {
         if (!device) {
           device.emplace(id, name, pin, cb);
           break;
@@ -198,7 +200,7 @@ class Pumps
 
     // is any pump running?
     bool isRunning() const {
-      for_each(pump)
+      for_each_pump(pump)
         if (pump.power())
           return true;
       return false;
@@ -209,7 +211,7 @@ class Pumps
       mode = m;
       Serial.printf(PSTR("Pumps set mode %d\n"), m);
 
-      for_each(pump) {
+      for_each_pump(pump) {
         switch (mode) {
           case PUMP_ON:
           case PUMP_OFF:
@@ -249,13 +251,13 @@ class Pumps
 
     void lock() {
       locked = true;
-      for_each(pump)
+      for_each_pump(pump)
         pump.disable();
     }
 
     void unlock() {
       locked = false;
-      for_each(pump)
+      for_each_pump(pump)
         pump.enable();
     }
     
@@ -266,7 +268,7 @@ class Pumps
   private:
 
     Mode mode;
-    std::array<std::optional<Device>, 2> devices;
+    std::array<std::optional<Device>, 2> registry;
     bool locked;
 
     void onCronTriggeredImpl() {
@@ -280,7 +282,7 @@ class Pumps
       Serial.printf(PSTR("Cron #%d triggered "), id);
       
       // find the corresponding pump and settings
-      for_each(pump) {
+      for_each_pump(pump) {
         for (int i=0; i<10; i++) {
           auto& prog = pump.programs[program][i];
           if (prog.id == id) {

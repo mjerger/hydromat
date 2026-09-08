@@ -12,6 +12,7 @@ enum WaterLevelID
   WATER_MAXIMUM
 };
 
+
 class WaterLevel
 {
   public:
@@ -21,10 +22,15 @@ class WaterLevel
     const uint8_t  percent;
 };
 
+
 struct WaterLevelSample
 {
   uint16_t raw;
   uint8_t level;
+  
+  String toString() const {
+    return String(raw) + ' ' + String(level);
+  }
 };
 
 
@@ -84,7 +90,7 @@ class WaterLevelSensor : public Sensor<WaterLevelSample>
           current_level = (WaterLevelID)s.level;
         
           auto& l = levels[s.level];
-          Serial.printf(PSTR("Level %s %d %s %d%% (%d raw)\n"), sensorName(), s.level, l.name, l.percent, s.raw);
+          Serial.printf(PSTR("Level %s %d %s %d%% (%d raw)\n"), name(), s.level, l.name, l.percent, s.raw);
           
           if (onChange)
             onChange(l);

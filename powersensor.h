@@ -13,7 +13,15 @@ struct PowerSample {
   uint16_t bus_mW;
   uint16_t load_mV;
   uint16_t batt_mV;
+  String toString() const {
+    return String(bus_mV)  + ' ' +
+           String(bus_mA)  + ' ' +
+           String(bus_mW)  + ' ' +
+           String(load_mV) + ' ' +
+           String(batt_mV); 
+  }
 };
+
 
 class PowerSensor : public Sensor<PowerSample>
 {
@@ -74,7 +82,7 @@ class PowerSensor : public Sensor<PowerSample>
         if (sampleTimer.ticked()) {
           Sensor::push(reading);
           Serial.printf(PSTR("Power %s bus %dmV, %dmA, %dmW load %dmV batt %dmV\n"), 
-            sensorName(), reading.bus_mV, reading.bus_mA, reading.bus_mW, reading.load_mV, reading.batt_mV);
+            name(), reading.bus_mV, reading.bus_mA, reading.bus_mW, reading.load_mV, reading.batt_mV);
         }
       }
     }
