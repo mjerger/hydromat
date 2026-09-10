@@ -294,7 +294,7 @@ void updateLeftStatusLight() {
 
 
 EFunc backlightEffect(uint32_t seed) {
-  return [seed] (int i, uint32_t t) -> CRGB {
+  return [seed] (uint8_t i, uint32_t t) -> CRGB {
     static const EFunc glitch = Effects::glitch(seed);
     static const EFunc flash  = Effects::blink(200, 900);
     static const EFunc pulse  = Effects::pulse(4000, 0.05);
@@ -312,8 +312,9 @@ EFunc backlightEffect(uint32_t seed) {
       color = CRGB::Blue;
       color = mult(color, pulse(i, t));
     } else if (pumps.isRunning()) {
-      color = CRGB::SkyBlue;
-      color = mult(color, rotate(i, t));
+      CRGB v = rotate(i, t);
+      color = CRGB::Blue;
+      color = mult(color, mult(v,v));
     }
 
     // overlay battery indicator
@@ -352,7 +353,7 @@ void setup() {
   Serial.printf(PSTR("RNG seed is %d\n"), seed);
 
   // switch position sets the switch light
-  lights.set(SWITCH, [](int i, uint32_t t) -> CRGB { 
+  lights.set(SWITCH, [](uint8_t i, uint32_t t) -> CRGB {
     if (i == 4 - swtch.position()) 
       return Effects::ON; 
     return Effects::ON % 4;

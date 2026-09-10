@@ -2,7 +2,7 @@
 
 #include <functional>
 
-using EFunc = std::function<CRGB(int i, uint32_t t)>;
+using EFunc = std::function<CRGB(uint8_t i, uint32_t t)>;
 
 struct Effect {
   EFunc    func;
@@ -20,18 +20,18 @@ namespace Effects
   }
 
 
-  EFunc off = [](int i, uint32_t t) {
+  EFunc off = [](uint8_t i, uint32_t t) {
     return OFF;
   };
 
 
-  EFunc on = [](int i, uint32_t t) {
+  EFunc on = [](uint8_t i, uint32_t t) {
     return ON;
   };
 
 
   EFunc onFor(uint32_t ms) {
-    return [ms] (int i, uint32_t t) -> CRGB {
+    return [ms] (uint8_t i, uint32_t t) -> CRGB {
       if (t > ms)
         return OFF;
       return ON;
@@ -40,7 +40,7 @@ namespace Effects
 
 
   EFunc blink(uint32_t on_ms, int off_ms) {
-    return [on_ms, off_ms] (int i, uint32_t t) -> CRGB {
+    return [on_ms, off_ms] (uint8_t i, uint32_t t) -> CRGB {
       if (t % (on_ms+off_ms) > on_ms)
         return OFF;
       return ON;
@@ -49,7 +49,7 @@ namespace Effects
 
 
   EFunc pulse(uint32_t ms, float min = 0, float phi = 0) {
-    return [ms, min, phi] (int i, uint32_t t) -> CRGB {
+    return [ms, min, phi] (uint8_t i, uint32_t t) -> CRGB {
       float phase = (float)(t % ms) / ms + i * phi;
       float f = (sin(phase * TWO_PI) + 1.0f) * 0.5f;
       return fract(min + (f * (1.0f - min)));
@@ -58,7 +58,7 @@ namespace Effects
 
 
   EFunc fadeIn(uint32_t ms) {
-    return [ms] (int i, uint32_t t) -> CRGB {
+    return [ms] (uint8_t i, uint32_t t) -> CRGB {
       if (t >= ms)
         return ON;
       return fract((float)t / (float)ms);
@@ -67,7 +67,7 @@ namespace Effects
 
 
   EFunc fadeOutAfter(uint32_t on_ms, uint32_t fade_ms) {
-    return [on_ms, fade_ms] (int i, uint32_t t) -> CRGB {
+    return [on_ms, fade_ms] (uint8_t i, uint32_t t) -> CRGB {
       if (t < on_ms)
         return ON;
       if (t > on_ms + fade_ms)
@@ -78,41 +78,26 @@ namespace Effects
 
 
   EFunc rainbow(uint32_t ms, int len) {
-    return [ms, len] (int i, uint32_t t) -> CRGB {
+    return [ms, len] (uint8_t i, uint32_t t) -> CRGB {
        float phase = (float)(t % ms) / (float)ms + (float)i/(float)len;
        return CHSV((int)(255*phase)%255,255,255);
     };
   };
 
 
-  EFunc perlin(uint32_t a, uint32_t b) {
-    return [a, b] (int i, uint32_t t) -> CRGB {
-        return ON % inoise8(t / a + (i * b), t/10);
-    };
-  };
-
-
-  EFunc perlin_rainbow(uint32_t a, uint32_t b) {
-    return [a, b] (int i, uint32_t t) -> CRGB {
-        return CHSV(inoise8(t / a + (i * b), t/10), 255, 255);
-    };
-  };
-
-
-  EFunc sine(uint32_t a = 8, uint32_t b = 12) {
-    return [a, b] (int i, uint32_t t) -> CRGB {
+  EFunc sine(int32_t a = 8, uint32_t b = 12) {
+    return [a, b] (uint8_t i, uint32_t t) -> CRGB {
       return ON % sin8(t / a + i * b);
     };
   };
 
 
-  EFunc waves3(uint32_t a = 8, uint32_t b = 12, uint32_t c = 16) {
-    return [a, b, c] (int i, uint32_t t) -> CRGB {
-      uint8_t wave1 = sin8(t / 10 + i * a);
-      uint8_t wave2 = sin8(t / 20 + i * b);
-      uint8_t wave3 = sin8(t / 30 + i * c);
-
-      return ON % (wave1 + wave2 + wave3) / 3;
+  EFunc strips(uint8_t len_a, uint8_t len_b, int leds_per_sec) {
+    return [len_a, len_b, leds_per_sec] (uint8_t i, uint32_t t) -> CRGB {
+      uint8_t len   = len_a + len_b;
+      int32_t shift = (int)(t * leds_per_sec / 1000);
+      int32_t pos   = ((i + shift) % len + len) % len;
+      return ON % (uint8_t)(pos < len_a ? 255 : 0);
     };
   };
 
@@ -140,7 +125,7 @@ namespace Effects
     const uint32_t startupFlickerSlot = 40;   // faster stutter
     const uint8_t  startupOffChanceMax = 220; // near-total blackout right at t=0
 
-    return [main_seed, numLeds](int i, uint32_t t) -> CRGB {
+    return [main_seed, numLeds](uint8_t i, uint32_t t) -> CRGB {
       uint32_t ut = (uint32_t)t;
       bool off = false;
 
